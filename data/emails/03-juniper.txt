@@ -1,0 +1,4 @@
+From: payables@junipersl.example
+Account: Juniper Senior Living
+
+You gave us a credit for September after the storm closure. Why are we still getting a reminder for NB-3403?

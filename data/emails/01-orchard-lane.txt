@@ -1,0 +1,4 @@
+From: ap@orchardlane.example
+Account: Orchard Lane Apartments
+
+Hi, we've paid everything through October by EFT, the last one on Oct 3 (EFT 3415). Please stop sending reminders for NB-3507 and NB-3557.
