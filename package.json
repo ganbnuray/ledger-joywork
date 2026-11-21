@@ -1,0 +1,16 @@
+{
+  "name": "ledger-joywork",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "match": "tsx scripts/run-matcher.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}
