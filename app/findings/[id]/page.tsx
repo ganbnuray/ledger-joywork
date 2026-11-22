@@ -219,8 +219,8 @@ export default async function FindingPage({
             <p className="muted">No account was recorded for this payment. Showing the account it most likely belongs to.</p>
           )}
           <p className="muted" style={{ fontSize: 13 }}>
-            &ldquo;After fixes&rdquo; is the balance once every misapplied, wrong account and unapplied finding is corrected.
-            Highlighted rows are where this payment is recorded or belongs.
+            Highlighted rows are where this payment is recorded or belongs. &ldquo;After fixes&rdquo; shows the balance
+            only where correcting the findings would change it. Hover an invoice to see what it is for.
           </p>
           <InvoicesTable
             account={homeAccount}
@@ -228,6 +228,7 @@ export default async function FindingPage({
             corrected={corrected}
             recordedHere={recordedHere}
             meantHere={meantHere}
+            query={query}
           />
 
           <h2>Other payments on {homeAccount.name}</h2>
@@ -266,6 +267,7 @@ export default async function FindingPage({
                         corrected={corrected}
                         recordedHere={recordedHere}
                         meantHere={meantHere}
+                        query={query}
                       />
                       <p className="muted" style={{ marginTop: 14 }}>
                         Payments

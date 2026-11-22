@@ -669,3 +669,26 @@ details.sister summary:hover {
 .sister-body table {
   background: var(--bg);
 }
+
+table.compact td {
+  padding: 6px 10px;
+  vertical-align: middle;
+}
+
+table.compact td.mono {
+  white-space: nowrap;
+}
+
+.owed {
+  color: var(--needs_human);
+}
+
+.settled {
+  color: var(--ok);
+}
+
+.row-note {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--muted);
+}

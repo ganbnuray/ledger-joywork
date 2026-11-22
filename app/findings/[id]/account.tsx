@@ -9,26 +9,28 @@ import { ClickableRow } from "../../nav";
 
 type Balances = Map<string, InvoiceBalance>;
 
-function balanceText(b: InvoiceBalance): string {
-  if (b.state === "void") return "Void";
-  if (b.balance <= 0) return b.balance < 0 ? `Overpaid ${formatCents(-b.balance)}` : "Paid";
-  return `${formatCents(b.balance)} open`;
+function BalanceCell({ b }: { b: InvoiceBalance }) {
+  if (b.state === "void") return <span className="muted">Void</span>;
+  return <span className={b.balance > 0 ? "owed" : "settled"}>{formatCents(b.balance)}</span>;
 }
 
-// Every invoice on one account, with what the books say and what they say after the fixes.
-// Invoices this payment touches are marked, so the reader sees where its money is and should be.
+// Every invoice on one account: what was applied, what is left, and which payments paid it.
+// "After fixes" only shows a value when the matcher's fixes would change the balance.
+// Invoices this payment touches are highlighted.
 export function InvoicesTable({
   account,
   recorded,
   corrected,
   recordedHere,
   meantHere,
+  query,
 }: {
   account: Customer;
   recorded: Balances;
   corrected: Balances;
   recordedHere: Set<string>;
   meantHere: Set<string>;
+  query: string;
 }) {
   const invoices = ledger.invoices
     .filter((inv) => inv.customerId === account.id)
@@ -36,48 +38,52 @@ export function InvoicesTable({
 
   return (
     <div className="table-wrap">
-      <table>
+      <table className="compact">
         <thead>
           <tr>
             <th>Invoice</th>
-            <th>Due</th>
+            <th>Issued</th>
             <th className="num">Amount</th>
-            <th className="num">Books say</th>
+            <th className="num">Applied</th>
+            <th className="num">Balance</th>
             <th className="num">After fixes</th>
-            <th>This payment</th>
+            <th>Paid by</th>
           </tr>
         </thead>
         <tbody>
           {invoices.map((inv) => {
             const r = recorded.get(inv.number)!;
             const c = corrected.get(inv.number)!;
-            const changed = r.balance !== c.balance;
             const touched = recordedHere.has(inv.number) || meantHere.has(inv.number);
+            const paidBy = ledger.payments.filter((p) => p.applications.some((a) => a.invoice === inv.number));
+            let note = "";
+            if (recordedHere.has(inv.number) && !meantHere.has(inv.number)) note = "Recorded here, belongs elsewhere";
+            if (meantHere.has(inv.number) && !recordedHere.has(inv.number)) note = "Belongs here, not recorded";
             return (
-              <tr key={inv.number} className={touched ? "highlight" : undefined}>
-                <td>
-                  <span className="mono">{inv.number}</span>
+              <tr key={inv.number} className={touched ? "highlight" : undefined} title={inv.description}>
+                <td className="mono">
+                  {inv.number}
                   {inv.status === "void" && (
                     <span className="tag" style={{ marginLeft: 6 }}>
                       Void
                     </span>
                   )}
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {inv.description}
-                  </div>
+                  {note && <div className="row-note">{note}</div>}
                 </td>
-                <td className="mono" style={{ whiteSpace: "nowrap" }}>
-                  {inv.dueDate}
-                </td>
+                <td className="mono">{inv.issueDate}</td>
                 <td className="num">{formatCents(inv.amount)}</td>
-                <td className="num">{balanceText(r)}</td>
-                <td className="num" style={changed ? { fontWeight: 600 } : { color: "var(--muted)" }}>
-                  {balanceText(c)}
+                <td className="num">{formatCents(r.applied)}</td>
+                <td className="num">
+                  <BalanceCell b={r} />
                 </td>
-                <td style={{ fontSize: 13 }}>
-                  {recordedHere.has(inv.number) && !meantHere.has(inv.number) && "Recorded here, belongs elsewhere"}
-                  {meantHere.has(inv.number) && !recordedHere.has(inv.number) && "Belongs here, not recorded"}
-                  {meantHere.has(inv.number) && recordedHere.has(inv.number) && "Recorded here"}
+                <td className="num">{c.balance !== r.balance ? <BalanceCell b={c} /> : ""}</td>
+                <td className="mono">
+                  {paidBy.map((p, i) => (
+                    <span key={p.id}>
+                      {i > 0 && ", "}
+                      <Link href={`/findings/${p.id}${query}`}>{p.id}</Link>
+                    </span>
+                  ))}
                 </td>
               </tr>
             );
@@ -108,14 +114,14 @@ export function PaymentsTable({
 
   return (
     <div className="table-wrap">
-      <table>
+      <table className="compact">
         <thead>
           <tr>
             <th>Payment</th>
-            <th>Received</th>
+            <th>Date</th>
             <th className="num">Amount</th>
             <th>Memo</th>
-            <th>Recorded against</th>
+            <th>Applied to</th>
             <th>Status</th>
           </tr>
         </thead>
