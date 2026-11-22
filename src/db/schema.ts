@@ -35,4 +35,23 @@ alter table reviews add column if not exists customer_id text;
 
 -- Which version of the matcher wrote the findings. A new version reruns it once.
 create table if not exists meta (key text primary key, value text not null);
+
+-- The findings of every system version, kept so old and new results can be compared.
+create table if not exists finding_versions (
+  version text not null,
+  payment_id text not null,
+  status text not null,
+  likely_customer_id text,
+  likely_invoices text[] not null default '{}',
+  amount_cents bigint not null,
+  evidence jsonb not null,
+  flags jsonb not null,
+  decided_by text not null,
+  confidence text not null,
+  computed_at timestamptz not null default now(),
+  primary key (version, payment_id)
+);
+
+-- The system version a person was looking at when they reviewed. Empty for reviews saved before versions existed.
+alter table reviews add column if not exists matcher_version text;
 `;

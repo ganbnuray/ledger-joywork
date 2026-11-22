@@ -1,8 +1,9 @@
 import { Pool } from "pg";
 import { schema } from "./schema";
 import type { Ledger } from "../ledger/types";
-import { MATCHER_VERSION, matchAll, type Finding, type Status } from "../matcher/match";
+import { matchAll, type Finding, type Status } from "../matcher/match";
 import { screenMemos } from "../matcher/screen";
+import { MATCHER_VERSION } from "../matcher/versions";
 
 export type Review = {
   action: "confirm" | "correct";
@@ -12,6 +13,7 @@ export type Review = {
   customerId: string | null; // the account the person says it belongs to
   note: string;
   createdAt: Date;
+  matcherVersion: string | null; // the system version shown when the person reviewed, null if before versions
 };
 
 export type StoredFinding = Finding & {
@@ -65,24 +67,67 @@ export async function saveFindings(findings: Finding[]): Promise<void> {
       ],
     );
   }
+  await saveVersion(MATCHER_VERSION, findings, true);
   await db.query(
     "insert into meta (key, value) values ('matcher_version', $1) on conflict (key) do update set value = excluded.value",
     [MATCHER_VERSION],
   );
 }
 
-// Creates the tables, and runs the matcher when the database is empty or was written by an older matcher.
+// Stores one version's findings. Old versions are never overwritten (replace = false).
+async function saveVersion(version: string, findings: Finding[], replace: boolean): Promise<void> {
+  const db = pool();
+  for (const f of findings) {
+    await db.query(
+      `insert into finding_versions (version, payment_id, status, likely_customer_id, likely_invoices, amount_cents,
+         evidence, flags, decided_by, confidence)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       on conflict (version, payment_id) do ${
+         replace
+           ? `update set status = excluded.status, likely_customer_id = excluded.likely_customer_id,
+              likely_invoices = excluded.likely_invoices, amount_cents = excluded.amount_cents,
+              evidence = excluded.evidence, flags = excluded.flags, decided_by = excluded.decided_by,
+              confidence = excluded.confidence, computed_at = now()`
+           : "nothing"
+       }`,
+      [
+        version,
+        f.paymentId,
+        f.status,
+        f.likelyCustomerId,
+        f.likelyInvoices,
+        f.amount,
+        JSON.stringify(f.evidence),
+        JSON.stringify(f.flags),
+        f.decidedBy,
+        f.confidence,
+      ],
+    );
+  }
+}
+
+// Creates the tables, and runs the matcher when the database is empty or was written by an older version.
+// Before new findings replace old ones, the old ones are copied into finding_versions, so nothing is lost.
 let ready: Promise<void> | null = null;
 export function ensureReady(ledger: Ledger): Promise<void> {
   if (!ready) {
     ready = (async () => {
       const db = pool();
       await db.query(schema);
-      const { rows } = await db.query("select count(*)::int as n from findings");
-      const version = await db.query("select value from meta where key = 'matcher_version'");
-      const stale = version.rows[0]?.value !== MATCHER_VERSION;
-      if (rows[0].n < ledger.payments.length || stale) {
+      const { rows } = await db.query("select * from findings");
+      const stored = (await db.query("select value from meta where key = 'matcher_version'")).rows[0]?.value ?? null;
+
+      // Keep what an older version wrote. Databases from before versions existed hold version 1.
+      if (rows.length > 0 && stored !== MATCHER_VERSION) {
+        await saveVersion(stored ?? "1", rows.map((row) => fromRow(row, [])), false);
+      }
+      // Version 1 used rules only, so it can be rebuilt exactly if it was overwritten before it was kept.
+      await saveVersion("1", matchAll(ledger, { holdInjections: false }), false);
+
+      if (rows.length < ledger.payments.length || stored !== MATCHER_VERSION) {
         await saveFindings((await screenMemos(ledger, matchAll(ledger))).findings);
+      } else {
+        await saveVersion(MATCHER_VERSION, rows.map((row) => fromRow(row, [])), false);
       }
     })().catch((error) => {
       ready = null;
@@ -128,6 +173,7 @@ export async function listFindings(ledger: Ledger): Promise<StoredFinding[]> {
       customerId: r.customer_id,
       note: r.note,
       createdAt: r.created_at,
+      matcherVersion: r.matcher_version,
     });
     byPayment.set(r.payment_id, list);
   }
@@ -151,8 +197,46 @@ export async function addReview(
   const { rows } = await db.query("select status from findings where payment_id = $1", [paymentId]);
   if (rows.length === 0) throw new Error(`No finding for ${paymentId}`);
   await db.query(
-    `insert into reviews (payment_id, action, system_status, reviewed_status, note, invoices, customer_id)
-     values ($1, $2, $3, $4, $5, $6, $7)`,
-    [paymentId, action, rows[0].status, reviewedStatus, note, invoices, customerId],
+    `insert into reviews (payment_id, action, system_status, reviewed_status, note, invoices, customer_id, matcher_version)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [paymentId, action, rows[0].status, reviewedStatus, note, invoices, customerId, MATCHER_VERSION],
   );
+}
+
+export type VersionFinding = {
+  paymentId: string;
+  status: Status;
+  likelyCustomerId: string | null;
+  likelyInvoices: string[];
+  amount: number;
+  evidence: string[];
+  flags: Finding["flags"];
+  decidedBy: Finding["decidedBy"];
+  confidence: Finding["confidence"];
+};
+
+export type StoredVersion = { version: string; computedAt: Date; findings: Map<string, VersionFinding> };
+
+// Every stored version with its findings, oldest version first.
+export async function listVersions(ledger: Ledger): Promise<StoredVersion[]> {
+  await ensureReady(ledger);
+  const { rows } = await pool().query("select * from finding_versions order by version, payment_id");
+  const versions = new Map<string, StoredVersion>();
+  for (const row of rows) {
+    const v = versions.get(row.version) ?? { version: row.version, computedAt: row.computed_at, findings: new Map() };
+    if (row.computed_at > v.computedAt) v.computedAt = row.computed_at;
+    v.findings.set(row.payment_id, {
+      paymentId: row.payment_id,
+      status: row.status,
+      likelyCustomerId: row.likely_customer_id,
+      likelyInvoices: row.likely_invoices,
+      amount: Number(row.amount_cents),
+      evidence: row.evidence,
+      flags: row.flags,
+      decidedBy: row.decided_by,
+      confidence: row.confidence,
+    });
+    versions.set(row.version, v);
+  }
+  return [...versions.values()].sort((a, b) => Number(a.version) - Number(b.version) || a.version.localeCompare(b.version));
 }

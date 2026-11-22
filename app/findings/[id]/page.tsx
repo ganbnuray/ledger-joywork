@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import type { Application } from "@/src/ledger/types";
-import { listFindings, type Review } from "@/src/db/findings";
+import { listFindings, listVersions, type Review } from "@/src/db/findings";
+import { MATCHER_VERSION } from "@/src/matcher/versions";
 import { STATUSES, STATUS_HELP, STATUS_LABEL, flagLabel, needsReview } from "@/src/view/labels";
-import { filterFindings, filterQuery, reviewQueue, type FindingFilter } from "@/src/view/filter";
+import { filterFindings, filterQuery, reviewIsCurrent, reviewQueue, type FindingFilter } from "@/src/view/filter";
 import { reviewFinding } from "../../actions";
 import { FindingStatus, StatusBadge } from "../../ui";
 import { Pager } from "../../nav";
@@ -73,7 +74,7 @@ export default async function FindingPage({
 }) {
   const { id } = await params;
   const { from, error, ...filter } = await searchParams;
-  const all = await listFindings(ledger);
+  const [all, versions] = await Promise.all([listFindings(ledger), listVersions(ledger)]);
   const finding = all.find((f) => f.paymentId === id);
   const payment = ledger.payments.find((p) => p.id === id);
   if (!finding || !payment) notFound();
@@ -83,7 +84,7 @@ export default async function FindingPage({
   const suspicious = finding.flags.some((f) => f.kind === "suspicious_memo");
   const fromReview = from === "review";
 
-  const queue = fromReview ? all.filter((f) => needsReview(f) && f.reviews.length === 0) : [];
+  const queue = fromReview ? all.filter((f) => needsReview(f) && !reviewIsCurrent(f)) : [];
 
   // Previous and next follow the list the person came from: the review queue, or the filtered findings.
   const query = fromReview ? "?from=review" : filterQuery(filter);
@@ -151,13 +152,21 @@ export default async function FindingPage({
             <div className="review-result-main">
               <StatusBadge status={latest.reviewedStatus} />
               <span>
-                {latest.reviewedStatus === finding.status ? "Agrees with the system" : `The system said ${STATUS_LABEL[finding.status]}`}
+                {latest.reviewedStatus === latest.systemStatus
+                  ? "Agreed with the system at the time"
+                  : `The system said ${STATUS_LABEL[latest.systemStatus]} at the time`}
               </span>
               {belongsTo(latest) && <span>· Belongs to {belongsTo(latest)}</span>}
             </div>
             {latest.note && <div>&ldquo;{latest.note}&rdquo;</div>}
+            {latest.systemStatus !== finding.status && (
+              <div className="row-note" style={{ color: "var(--misapplied)" }}>
+                The system now says {STATUS_LABEL[finding.status]}. This review is kept, and the finding is back in the review
+                queue for a fresh look.
+              </div>
+            )}
             <div className="muted" style={{ fontSize: 12 }}>
-              Saved {formatWhen(latest.createdAt)} UTC
+              Saved {formatWhen(latest.createdAt)} UTC, {latest.matcherVersion ? `under system version ${latest.matcherVersion}` : "before versions were kept"}
               {finding.reviews.length > 1 ? ` · ${finding.reviews.length} reviews in the history below` : ""}
             </div>
           </>
@@ -250,6 +259,42 @@ export default async function FindingPage({
       <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
         Decided by {finding.decidedBy === "rule" ? "rules in code" : "the model"}, confidence {finding.confidence}.
       </p>
+
+      {versions.length > 1 && (
+        <>
+          <h2>System versions</h2>
+          <div className="table-wrap">
+            <table className="compact">
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th>Status</th>
+                  <th>Likely invoices</th>
+                  <th className="num">Involved</th>
+                  <th>Decided by</th>
+                </tr>
+              </thead>
+              <tbody>
+                {versions.map((v) => {
+                  const vf = v.findings.get(payment.id);
+                  return (
+                    <tr key={v.version}>
+                      <td>
+                        <Link href={`/versions?to=${v.version}`}>Version {v.version}</Link>
+                        {v.version === MATCHER_VERSION && <span className="row-note"> current</span>}
+                      </td>
+                      <td>{vf ? <StatusBadge status={vf.status} /> : <span className="muted">Not stored</span>}</td>
+                      <td className="mono">{vf?.likelyInvoices.join(", ")}</td>
+                      <td className="num">{vf && vf.amount ? formatCents(vf.amount) : ""}</td>
+                      <td style={{ fontSize: 13 }}>{vf ? `${vf.decidedBy === "rule" ? "Rules" : "Model"}, ${vf.confidence} confidence` : ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {homeAccount && (
         <>
@@ -391,6 +436,7 @@ export default async function FindingPage({
               <thead>
                 <tr>
                   <th>When (UTC)</th>
+                  <th>Version</th>
                   <th>Action</th>
                   <th>Status</th>
                   <th>Belongs to</th>
@@ -401,6 +447,7 @@ export default async function FindingPage({
                 {finding.reviews.map((r, i) => (
                   <tr key={i}>
                     <td className="mono">{formatWhen(r.createdAt)}</td>
+                    <td>{r.matcherVersion ?? <span className="muted">Before versions</span>}</td>
                     <td>{r.action === "confirm" ? "Confirmed" : r.reviewedStatus === r.systemStatus ? "Saved" : `Corrected from ${STATUS_LABEL[r.systemStatus]}`}</td>
                     <td>
                       <StatusBadge status={r.reviewedStatus} />

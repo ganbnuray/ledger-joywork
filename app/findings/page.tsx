@@ -3,7 +3,7 @@ import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import { listFindings } from "@/src/db/findings";
 import { STATUSES, STATUS_HELP, STATUS_LABEL, flagLabel, needsReview } from "@/src/view/labels";
-import { effectiveStatus, filterFindings, filterQuery, type FindingFilter } from "@/src/view/filter";
+import { effectiveStatus, filterFindings, filterQuery, reviewIsCurrent, type FindingFilter } from "@/src/view/filter";
 import type { Status } from "@/src/matcher/match";
 import { FindingStatus } from "../ui";
 import { ClickableRow } from "../nav";
@@ -146,7 +146,7 @@ export default async function FindingsPage({ searchParams }: { searchParams: Pro
                     <td className="num">{formatCents(p.amount)}</td>
                     <td>
                       <FindingStatus finding={f} />
-                      {needsReview(f) && f.reviews.length === 0 && (
+                      {needsReview(f) && !reviewIsCurrent(f) && (
                         <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
                           Waiting for review
                         </div>

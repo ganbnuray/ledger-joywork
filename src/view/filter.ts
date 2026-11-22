@@ -5,9 +5,16 @@ import { needsReview } from "./labels";
 
 export type FindingFilter = { status?: string; org?: string; review?: string; q?: string };
 
-// The status a person settled on, or the system's status if nobody reviewed it yet.
+// True when a person reviewed the finding and the system still says what it said then.
+// A review of an older answer stays in the history, but the finding needs a fresh look.
+export function reviewIsCurrent(f: StoredFinding): boolean {
+  const latest = f.reviews[0];
+  return latest !== undefined && latest.systemStatus === f.status;
+}
+
+// The status a person settled on, or the system's status if nobody reviewed its current answer.
 export function effectiveStatus(f: StoredFinding): Status {
-  return f.reviewedStatus ?? f.status;
+  return reviewIsCurrent(f) ? f.reviews[0].reviewedStatus : f.status;
 }
 
 function matchesSearch(f: StoredFinding, q: string, ledger: Ledger): boolean {
@@ -25,8 +32,8 @@ export function filterFindings(all: StoredFinding[], filter: FindingFilter, ledg
     if (filter.status && effectiveStatus(f) !== filter.status) return false;
     if (filter.org === "none" && account) return false;
     if (filter.org && filter.org !== "none" && account?.parent !== filter.org) return false;
-    if (filter.review === "unreviewed" && f.reviews.length > 0) return false;
-    if (filter.review === "reviewed" && f.reviews.length === 0) return false;
+    if (filter.review === "unreviewed" && reviewIsCurrent(f)) return false;
+    if (filter.review === "reviewed" && !reviewIsCurrent(f)) return false;
     if (filter.review === "queue" && !needsReview(f)) return false;
     if (filter.q && !matchesSearch(f, filter.q, ledger)) return false;
     return true;

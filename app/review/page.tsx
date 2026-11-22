@@ -2,8 +2,9 @@ import Link from "next/link";
 import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import { listFindings, type StoredFinding } from "@/src/db/findings";
-import { reviewQueue } from "@/src/view/filter";
+import { reviewIsCurrent, reviewQueue } from "@/src/view/filter";
 import { FindingStatus, StatusBadge } from "../ui";
+import { STATUS_LABEL } from "@/src/view/labels";
 import { ClickableRow } from "../nav";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +34,8 @@ function QueueItem({ f }: { f: StoredFinding }) {
         <span className="num" style={{ fontWeight: 600 }}>
           {formatCents(f.amount || p.amount)}
         </span>
-        <Link href={`/findings/${f.paymentId}?from=review`} className={f.reviews.length ? "button secondary" : "button"}>
-          {f.reviews.length ? "Open" : "Review"}
+        <Link href={`/findings/${f.paymentId}?from=review`} className={reviewIsCurrent(f) ? "button secondary" : "button"}>
+          {reviewIsCurrent(f) ? "Open" : f.reviews.length ? "Review again" : "Review"}
         </Link>
       </div>
     </div>
@@ -45,12 +46,12 @@ export default async function ReviewPage() {
   const all = await listFindings(ledger);
   // Biggest amounts first, so the most money at stake gets looked at first.
   const unsure = reviewQueue(all);
-  const waiting = unsure.filter((f) => f.reviews.length === 0);
+  const waiting = unsure.filter((f) => !reviewIsCurrent(f));
   // Latest decision first.
   const reviewed = all
     .filter((f) => f.reviews.length > 0)
     .sort((a, b) => new Date(b.reviews[0].createdAt).getTime() - new Date(a.reviews[0].createdAt).getTime());
-  const agree = reviewed.filter((f) => f.reviews[0].reviewedStatus === f.status).length;
+  const agree = reviewed.filter((f) => f.reviews[0].reviewedStatus === f.reviews[0].systemStatus).length;
 
   return (
     <>
@@ -94,7 +95,7 @@ export default async function ReviewPage() {
               <thead>
                 <tr>
                   <th>Payment</th>
-                  <th>System said</th>
+                  <th>System said then</th>
                   <th>Your answer</th>
                   <th>Belongs to</th>
                   <th>Note</th>
@@ -113,11 +114,12 @@ export default async function ReviewPage() {
                         </Link>
                       </td>
                       <td>
-                        <StatusBadge status={f.status} />
+                        <StatusBadge status={r.systemStatus} />
+                        {r.systemStatus !== f.status && <div className="row-note">Now {STATUS_LABEL[f.status]}</div>}
                       </td>
                       <td>
                         <StatusBadge status={r.reviewedStatus} />
-                        {r.reviewedStatus !== f.status && <div className="row-note">Corrected</div>}
+                        {r.reviewedStatus !== r.systemStatus && <div className="row-note">Corrected</div>}
                       </td>
                       <td>
                         <span className="mono">{r.invoices.join(", ")}</span>

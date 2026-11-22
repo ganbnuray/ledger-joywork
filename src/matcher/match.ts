@@ -4,8 +4,7 @@ import { openInvoices, recordedBalances, type InvoiceBalance } from "../ledger/b
 import { parseMemo, type MemoSignals } from "./memo";
 import { appliedTotal, findDuplicateOf, numericFlags, replacementFor, type Flag } from "./flags";
 
-// Bump this when a rule changes, so stored findings are recomputed on the next start.
-export const MATCHER_VERSION = "2";
+export { MATCHER_VERSION } from "./versions";
 
 export type Status = "ok" | "misapplied" | "wrong_account" | "unapplied" | "needs_human";
 
@@ -113,9 +112,19 @@ export function holdForInjection(f: Finding, decidedBy: "rule" | "model", reason
   return { ...f, status: "needs_human", confidence: "low", decidedBy, flags, evidence };
 }
 
-export function matchPayment(p: Payment, ledger: Ledger, balances: Map<string, InvoiceBalance> = recordedBalances(ledger)): Finding {
+export type MatchOptions = {
+  // Version 1 did not send injection attempts to a person. Kept so its results can be rebuilt.
+  holdInjections: boolean;
+};
+
+export function matchPayment(
+  p: Payment,
+  ledger: Ledger,
+  balances: Map<string, InvoiceBalance> = recordedBalances(ledger),
+  options: MatchOptions = { holdInjections: true },
+): Finding {
   const finding = matchByNumbers(p, ledger, balances);
-  return parseMemo(p.memo, ledger).suspicious ? holdForInjection(finding, "rule") : finding;
+  return options.holdInjections && parseMemo(p.memo, ledger).suspicious ? holdForInjection(finding, "rule") : finding;
 }
 
 function matchByNumbers(p: Payment, ledger: Ledger, balances: Map<string, InvoiceBalance>): Finding {
@@ -358,9 +367,9 @@ function matchByNumbers(p: Payment, ledger: Ledger, balances: Map<string, Invoic
   };
 }
 
-export function matchAll(ledger: Ledger): Finding[] {
+export function matchAll(ledger: Ledger, options: MatchOptions = { holdInjections: true }): Finding[] {
   const balances = recordedBalances(ledger);
-  return ledger.payments.map((p) => matchPayment(p, ledger, balances));
+  return ledger.payments.map((p) => matchPayment(p, ledger, balances, options));
 }
 
 // Where each payment's money should sit after the fixes we are sure about.

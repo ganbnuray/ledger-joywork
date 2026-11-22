@@ -33,7 +33,7 @@ Then fill in `.env`:
 | `npm start` | Runs the production build from `npm run build` at http://localhost:3000. |
 | `npm run db:seed` | Creates the tables if needed, runs the matcher and writes all 38 findings to the database. Reviews already in the database are kept. Reads `DATABASE_URL` from `.env`. |
 
-The app also seeds itself on the first page load if the database is empty, or if the stored findings come from an older matcher (`MATCHER_VERSION` in `src/matcher/match.ts`). So after changing a rule, bump that version and the deployed app recomputes the findings once, keeping all reviews.
+The app also seeds itself on the first page load if the database is empty, or if the stored findings come from an older matcher (`MATCHER_VERSION` in `src/matcher/match.ts`). So after changing a rule or a model prompt, add an entry to `VERSIONS` in `src/matcher/versions.ts` and the deployed app recomputes the findings once. The old version's findings are kept in the `finding_versions` table, manual reviews are never deleted, and the Versions page (`/versions`) compares any two versions side by side.
 
 With `ANTHROPIC_API_KEY` set, seeding also has the model check every memo for injection attempts. A flagged memo sends its payment to "needs a person". The model can add this flag but never remove one the rules raised.
 
