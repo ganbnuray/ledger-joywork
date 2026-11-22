@@ -2,7 +2,7 @@
 
 Finds payments and credits recorded against the wrong invoice or account, so a person can fix the books before a customer who already paid gets chased.
 
-Live app: ADD_DEPLOYED_URL
+Live app: [Vercel Site](https://ledger-joywork.vercel.app/)
 
 The task is in [`docs/SPEC.md`](docs/SPEC.md). The input is [`data/ledger.json`](data/ledger.json): 12 accounts, 79 invoices, and 38 payments and credits, as of November 20, 2026. The current version gives 23 ok, 6 misapplied, 3 wrong account, 2 unapplied and 4 needs a person.
 
