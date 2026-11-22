@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ledger } from "@/src/ledger/bundled";
 import { addReview, listFindings } from "@/src/db/findings";
@@ -9,8 +10,12 @@ import { readEmail, type ReadResult } from "@/src/email/model";
 import { checkEmail, type EmailCheck } from "@/src/email/check";
 import { STATUSES } from "@/src/view/labels";
 import { reviewIsCurrent, reviewQueue } from "@/src/view/filter";
+import { VERSION_COOKIE, viewedVersion } from "@/src/view/version";
+import { MATCHER_VERSION } from "@/src/matcher/versions";
 
 export async function reviewFinding(formData: FormData) {
+  // Reviews are always made against the current version, so they record what the system says now.
+  if (!(await viewedVersion(ledger)).isCurrent) throw new Error("Switch to the current version to review.");
   const paymentId = String(formData.get("paymentId"));
   const action = formData.get("action") === "correct" ? "correct" : "confirm";
   const systemStatus = String(formData.get("systemStatus")) as Status;
@@ -54,6 +59,16 @@ export async function checkEmailAction(_prev: EmailState, formData: FormData): P
   const read = await readEmail(text, ledger);
   // The email check uses the system's stored findings (rules plus the model's memo check),
   // not the review history, so its answer always traces back to the ledger.
-  const result = checkEmail(read.claims, ledger, await listFindings(ledger));
+  const result = checkEmail(read.claims, ledger, await listFindings(ledger, (await viewedVersion(ledger)).version));
   return { text, read, result };
+}
+
+// Remembers which system version to show, then reloads the page the person was on.
+export async function setViewedVersion(formData: FormData) {
+  const version = String(formData.get("version") ?? "");
+  const store = await cookies();
+  if (version === "" || version === MATCHER_VERSION) store.delete(VERSION_COOKIE);
+  else store.set(VERSION_COOKIE, version, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 30 });
+  const back = new URL((await headers()).get("referer") ?? "/findings", "http://local");
+  redirect(back.pathname.startsWith("/") ? back.pathname + back.search : "/findings");
 }

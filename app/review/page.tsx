@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import { listFindings, type StoredFinding } from "@/src/db/findings";
+import { viewedVersion } from "@/src/view/version";
 import { reviewIsCurrent, reviewQueue } from "@/src/view/filter";
 import { FindingStatus, StatusBadge } from "../ui";
 import { STATUS_LABEL } from "@/src/view/labels";
@@ -43,7 +44,8 @@ function QueueItem({ f }: { f: StoredFinding }) {
 }
 
 export default async function ReviewPage() {
-  const all = await listFindings(ledger);
+  const viewed = await viewedVersion(ledger);
+  const all = await listFindings(ledger, viewed.version);
   // Biggest amounts first, so the most money at stake gets looked at first.
   const unsure = reviewQueue(all);
   const waiting = unsure.filter((f) => !reviewIsCurrent(f));

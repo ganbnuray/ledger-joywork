@@ -715,3 +715,33 @@ table.compact td.mono {
   align-items: center;
   gap: 8px;
 }
+
+.version-switch label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.version-switch select {
+  padding: 3px 6px;
+  font-size: 13px;
+}
+
+.old-version {
+  background: var(--misapplied-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.old-version-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}

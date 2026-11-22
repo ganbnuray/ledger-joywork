@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import { listFindings } from "@/src/db/findings";
+import { viewedVersion } from "@/src/view/version";
 import { STATUSES, STATUS_HELP, STATUS_LABEL, flagLabel, needsReview } from "@/src/view/labels";
 import { effectiveStatus, filterFindings, filterQuery, reviewIsCurrent, type FindingFilter } from "@/src/view/filter";
 import type { Status } from "@/src/matcher/match";
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 
 export default async function FindingsPage({ searchParams }: { searchParams: Promise<FindingFilter> }) {
   const search = await searchParams;
-  const all = await listFindings(ledger);
+  const viewed = await viewedVersion(ledger);
+  const all = await listFindings(ledger, viewed.version);
   const orgs = [...new Set(ledger.customers.map((c) => c.parent))].sort();
   const filtered = filterFindings(all, search, ledger);
   // Detail links carry the filters, so previous and next stay inside this list.

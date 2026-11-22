@@ -80,14 +80,15 @@ async function saveVersion(version: string, findings: Finding[], replace: boolea
   for (const f of findings) {
     await db.query(
       `insert into finding_versions (version, payment_id, status, likely_customer_id, likely_invoices, amount_cents,
-         evidence, flags, decided_by, confidence)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         evidence, flags, decided_by, confidence, intended_applications)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        on conflict (version, payment_id) do ${
          replace
            ? `update set status = excluded.status, likely_customer_id = excluded.likely_customer_id,
               likely_invoices = excluded.likely_invoices, amount_cents = excluded.amount_cents,
               evidence = excluded.evidence, flags = excluded.flags, decided_by = excluded.decided_by,
-              confidence = excluded.confidence, computed_at = now()`
+              confidence = excluded.confidence, intended_applications = excluded.intended_applications,
+              computed_at = now()`
            : "nothing"
        }`,
       [
@@ -101,9 +102,28 @@ async function saveVersion(version: string, findings: Finding[], replace: boolea
         JSON.stringify(f.flags),
         f.decidedBy,
         f.confidence,
+        JSON.stringify(f.intendedApplications),
       ],
     );
   }
+}
+
+// Fills in where the money belongs for versions stored before that column existed.
+// Version 1 is rebuilt from its rules. The current version is copied from the live findings.
+async function backfillIntended(ledger: Ledger): Promise<void> {
+  const db = pool();
+  for (const f of matchAll(ledger, { holdInjections: false })) {
+    await db.query(
+      `update finding_versions set intended_applications = $1
+       where version = '1' and payment_id = $2 and intended_applications is null`,
+      [JSON.stringify(f.intendedApplications), f.paymentId],
+    );
+  }
+  await db.query(
+    `update finding_versions fv set intended_applications = f.intended_applications
+     from findings f where fv.version = $1 and fv.payment_id = f.payment_id and fv.intended_applications is null`,
+    [MATCHER_VERSION],
+  );
 }
 
 // Creates the tables, and runs the matcher when the database is empty or was written by an older version.
@@ -129,6 +149,7 @@ export function ensureReady(ledger: Ledger): Promise<void> {
       } else {
         await saveVersion(MATCHER_VERSION, rows.map((row) => fromRow(row, [])), false);
       }
+      await backfillIntended(ledger);
     })().catch((error) => {
       ready = null;
       throw error;
@@ -155,15 +176,10 @@ function fromRow(row: any, reviews: Review[]): StoredFinding {
   };
 }
 
-export async function listFindings(ledger: Ledger): Promise<StoredFinding[]> {
-  await ensureReady(ledger);
-  const db = pool();
-  const [findings, reviews] = await Promise.all([
-    db.query("select * from findings order by payment_id"),
-    db.query("select * from reviews order by created_at desc, id desc"),
-  ]);
+async function reviewsByPayment(): Promise<Map<string, Review[]>> {
+  const { rows } = await pool().query("select * from reviews order by created_at desc, id desc");
   const byPayment = new Map<string, Review[]>();
-  for (const r of reviews.rows) {
+  for (const r of rows) {
     const list = byPayment.get(r.payment_id) ?? [];
     list.push({
       action: r.action,
@@ -177,7 +193,32 @@ export async function listFindings(ledger: Ledger): Promise<StoredFinding[]> {
     });
     byPayment.set(r.payment_id, list);
   }
-  return findings.rows.map((row) => fromRow(row, byPayment.get(row.payment_id) ?? []));
+  return byPayment;
+}
+
+// The findings as one system version gave them, with every manual review attached.
+// Without a version, or with one that is not stored, this is the current version.
+export async function listFindings(ledger: Ledger, version: string = MATCHER_VERSION): Promise<StoredFinding[]> {
+  await ensureReady(ledger);
+  const db = pool();
+  const reviews = await reviewsByPayment();
+  const attach = (row: any) => fromRow(row, reviews.get(row.payment_id) ?? []);
+
+  if (version !== MATCHER_VERSION) {
+    const { rows } = await db.query("select * from finding_versions where version = $1 order by payment_id", [version]);
+    if (rows.length > 0) {
+      const recordedOn = new Map(ledger.payments.map((p) => [p.id, p.customerId]));
+      return rows.map((row) => attach({ ...row, recorded_customer_id: recordedOn.get(row.payment_id) ?? null }));
+    }
+  }
+  const { rows } = await db.query("select * from findings order by payment_id");
+  return rows.map(attach);
+}
+
+export async function listVersionNames(ledger: Ledger): Promise<string[]> {
+  await ensureReady(ledger);
+  const { rows } = await pool().query("select distinct version from finding_versions");
+  return rows.map((r) => r.version as string).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
 }
 
 export async function getFinding(ledger: Ledger, paymentId: string): Promise<StoredFinding | null> {

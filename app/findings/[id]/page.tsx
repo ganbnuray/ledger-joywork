@@ -5,6 +5,7 @@ import { formatCents } from "@/src/ledger/money";
 import type { Application } from "@/src/ledger/types";
 import { listFindings, listVersions, type Review } from "@/src/db/findings";
 import { MATCHER_VERSION } from "@/src/matcher/versions";
+import { viewedVersion } from "@/src/view/version";
 import { STATUSES, STATUS_HELP, STATUS_LABEL, flagLabel, needsReview } from "@/src/view/labels";
 import { filterFindings, filterQuery, reviewIsCurrent, reviewQueue, type FindingFilter } from "@/src/view/filter";
 import { reviewFinding } from "../../actions";
@@ -74,7 +75,8 @@ export default async function FindingPage({
 }) {
   const { id } = await params;
   const { from, error, ...filter } = await searchParams;
-  const [all, versions] = await Promise.all([listFindings(ledger), listVersions(ledger)]);
+  const viewed = await viewedVersion(ledger);
+  const [all, versions] = await Promise.all([listFindings(ledger, viewed.version), listVersions(ledger)]);
   const finding = all.find((f) => f.paymentId === id);
   const payment = ledger.payments.find((p) => p.id === id);
   if (!finding || !payment) notFound();
@@ -282,6 +284,7 @@ export default async function FindingPage({
                       <td>
                         <Link href={`/versions?to=${v.version}`}>Version {v.version}</Link>
                         {v.version === MATCHER_VERSION && <span className="row-note"> current</span>}
+                        {v.version === viewed.version && v.version !== MATCHER_VERSION && <span className="row-note"> viewing</span>}
                       </td>
                       <td>{vf ? <StatusBadge status={vf.status} /> : <span className="muted">Not stored</span>}</td>
                       <td className="mono">{vf?.likelyInvoices.join(", ")}</td>
@@ -369,6 +372,13 @@ export default async function FindingPage({
       )}
 
       <h2 id="review">Review</h2>
+      {!viewed.isCurrent ? (
+        <div className="notice">
+          You are viewing version {viewed.version}. Reviews always record what the current system says, so switch to version{" "}
+          {MATCHER_VERSION} in the top bar to review this payment.
+        </div>
+      ) : (
+        <>
       {error && <div className="notice bad">Not saved. {error}.</div>}
       <div className="panel">
         <form action={reviewFinding} className="review-form">
@@ -427,6 +437,9 @@ export default async function FindingPage({
           </div>
         </form>
       </div>
+
+        </>
+      )}
 
       {finding.reviews.length > 0 && (
         <>

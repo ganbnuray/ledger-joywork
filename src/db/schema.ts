@@ -52,6 +52,9 @@ create table if not exists finding_versions (
   primary key (version, payment_id)
 );
 
+-- Where each version said the money belongs. Added after the first version of this table.
+alter table finding_versions add column if not exists intended_applications jsonb;
+
 -- The system version a person was looking at when they reviewed. Empty for reviews saved before versions existed.
 alter table reviews add column if not exists matcher_version text;
 `;

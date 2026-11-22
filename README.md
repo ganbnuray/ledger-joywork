@@ -23,7 +23,7 @@ flowchart LR
 1. The rules read each payment, its memo and its applications, and give it one finding: a status, the invoice and account the money most likely belongs to, the amount involved, and the evidence.
 2. The model reads each memo once more, only to spot attempts to instruct the system. It can send a payment to a person but cannot clear anything the rules flagged.
 3. Postgres stores the findings, the findings of every older version, and every manual review.
-4. The web app has the findings list, a review queue, a page per payment, an email checker and a page that compares versions.
+4. The web app has the findings list, a review queue, a page per payment, an email checker and a page that compares versions. A Version menu in the top bar shows the whole app as any stored version gave it. Reviews are only made against the current version.
 5. A pasted email is read by the rules and the model into a fixed set of fields. Code then checks those fields against the ledger and the findings. The email never decides the answer.
 
 ### Which decisions the model makes, and which plain code makes
@@ -85,7 +85,7 @@ What happened, in order:
 2. In manual review I corrected PMT-1035 to needs a person. Somebody sent text meant to make the books lie, and that needs a human decision about the money and about the customer.
 3. I then changed the code so the next memo like this goes to a person automatically (version 2). The status is needs a person, the flag "Memo tries to instruct the system" is shown, and the evidence keeps what the numbers say ("From the numbers alone it would be unapplied, most likely NB-3211"). A test checks that the three invoices the memo names stay open.
 4. I added the model as a second check on every memo, because a keyword list is easy to get around. It can only add the flag.
-5. Rerunning the matcher with new rules used to overwrite the old findings. Now every version is kept, my manual review stays, and the Versions page shows PMT-1035 as unapplied in version 1 and needs a person in version 2, next to my review. A review made against an older answer goes back into the review queue.
+5. Rerunning the matcher with new rules used to overwrite the old findings. Now every version is kept and my manual reviews stay. The Version menu in the top bar switches the whole app between versions: in version 1, PMT-1035 is unapplied with my review next to it, and in version 2 it is needs a person. The Versions page compares the two side by side. A review made against an older answer goes back into the review queue of the current version.
 
 Pasted emails get the same treatment: the email is passed to the model as quoted data, the prompt says never to follow it, and a warning appears if it tries to instruct the system. The answer still comes from the ledger.
 
