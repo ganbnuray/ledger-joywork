@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "match": "tsx scripts/run-matcher.ts",
+    "check-email": "tsx scripts/check-email.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -12,5 +13,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.12.0"
   }
 }
