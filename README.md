@@ -107,6 +107,32 @@ I never change `ledger.json`. Each problem below becomes a finding or a flag, an
 
 One thing looked broken and is not: `Card ****4417` appears on two payments. It is the same card used in June and July, not a duplicate, and the app leaves both as ok.
 
+## What would prevent these errors
+
+The biggest weakness of this ledger is its structure. The only link between a payment and the invoice it pays is the memo, which is free text the customer writes, and a person reads it to decide where the money goes. A ledger should record that link in its own fields: the invoices a payment addresses, and a reference the system can read with no guesswork, such as one Brightline issues per invoice or per location. The memo would then be a note and nothing more.
+
+With that in place, many of the problems above would not happen:
+
+| Problem | With structured references |
+|---|---|
+| Money on the wrong month (PMT-1003, PMT-1027, Orchard Lane) | Code applies the money to the invoices in the reference. Nobody has to choose. |
+| Money on a sister account (PMT-1005, PMT-1029, PMT-1032) | A reference or bank account number per location tells the system which account paid. |
+| A wire with no account (PMT-1033) | The reference names the customer. |
+| Prompt injection (PMT-1035) | No decision reads the memo, so an instruction hidden in it has nothing to act on. The memo is still customer text and is still treated as data. |
+| A claimed discount (PMT-1026) | A field for the reason of a short payment makes the claim explicit. Someone still checks it, which works best if agreed discounts are stored as data too. |
+
+Some errors happen inside the books and need checks at the moment a payment is recorded, whatever the customer sends:
+
+- applications cannot add up to more than the payment (PMT-1037)
+- a void invoice cannot receive money (PMT-1038)
+- an invoice issued after the payment arrived cannot receive it (PMT-1005, PMT-1027)
+- a credit is applied when it is issued (PMT-1011)
+- a new payment is compared with recent ones for the same account and amount (PMT-1021)
+
+A structured field can still be wrong, since a customer can type the wrong invoice number into a field as easily as into a memo. The amount and account checks this app makes would stay as a second line of defense.
+
+JoyWork works with the books its clients already have and cannot change how their customers pay. So the matcher is still needed for the data as it is. What it finds also makes the case for the fix upstream: in this ledger, 15 of 38 payments and credits needed a correction or a person, and most of them trace back to the memo being the only link.
+
 ## How I used AI tools, and how I checked them
 
 I built this with Claude Code. The full sessions are in [`ai-logs/`](ai-logs/).
