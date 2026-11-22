@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { Pool } from "pg";
 import { schema } from "./schema";
 import type { Ledger } from "../ledger/types";
@@ -126,6 +128,36 @@ async function backfillIntended(ledger: Ledger): Promise<void> {
   );
 }
 
+// A fresh database (the live site, for example) starts with no reviews. If labels are committed in
+// data/labels.json, they are loaded as the reviews, with their original dates and versions.
+// A database that already has reviews is never touched.
+async function importLabelsIfEmpty(): Promise<void> {
+  const file = path.join(process.cwd(), "data", "labels.json");
+  if (!existsSync(file)) return;
+  const db = pool();
+  const { rows } = await db.query("select count(*)::int as n from reviews");
+  if (rows[0].n > 0) return;
+  const labels = JSON.parse(readFileSync(file, "utf8")) as Label[];
+  for (const l of labels) {
+    await db.query(
+      `insert into reviews (payment_id, action, system_status, reviewed_status, note, invoices, customer_id,
+         matcher_version, created_at)
+       select $1, $2, $3, $4, $5, $6, $7, $8, $9 where exists (select 1 from findings where payment_id = $1)`,
+      [
+        l.payment_id,
+        l.status === l.system_status_at_review ? "confirm" : "correct",
+        l.system_status_at_review,
+        l.status,
+        l.note ?? "",
+        l.invoices ?? [],
+        l.customer_id,
+        l.reviewed_under_version,
+        l.reviewed_at,
+      ],
+    );
+  }
+}
+
 // Creates the tables, and runs the matcher when the database is empty or was written by an older version.
 // Before new findings replace old ones, the old ones are copied into finding_versions, so nothing is lost.
 let ready: Promise<void> | null = null;
@@ -150,6 +182,7 @@ export function ensureReady(ledger: Ledger): Promise<void> {
         await saveVersion(MATCHER_VERSION, rows.map((row) => fromRow(row, [])), false);
       }
       await backfillIntended(ledger);
+      await importLabelsIfEmpty();
     })().catch((error) => {
       ready = null;
       throw error;
