@@ -56,7 +56,15 @@ My labels are my manual reviews. I reviewed all 38 payments and credits in the a
 
 The Evaluation page (`/evaluation`) compares a version with these labels: precision and recall per status, a confusion table, and the payments where the system and I disagree. The Version menu scores version 1 or version 2 against the same labels. `npm run evaluate` prints the same numbers from the committed file.
 
-LABELS_TABLE
+Version 1 agrees with 37 of my 38 labels. The one disagreement is PMT-1035, the injection memo: version 1 called it unapplied, and I labeled it needs a person. That disagreement is what led to version 2, which agrees with all 38.
+
+| Status | Version 1 precision | Version 1 recall | Version 2 precision | Version 2 recall |
+|---|---|---|---|---|
+| ok (23 labels) | 100% | 100% | 100% | 100% |
+| misapplied (6) | 100% | 100% | 100% | 100% |
+| wrong account (3) | 100% | 100% | 100% | 100% |
+| unapplied (2) | 67% (2 of 3) | 100% | 100% | 100% |
+| needs a person (4) | 100% | 75% (3 of 4) | 100% | 100% |
 
 I worked out the cases by hand before writing the rules, and I labeled the same data afterward, so high agreement is expected. The disagreements say more than the percentages.
 
