@@ -1,0 +1,466 @@
+[
+  {
+    "payment_id": "PMT-1001",
+    "status": "ok",
+    "invoices": [
+      "NB-3101"
+    ],
+    "customer_id": "C-101",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:30:16.329Z"
+  },
+  {
+    "payment_id": "PMT-1002",
+    "status": "ok",
+    "invoices": [
+      "NB-3201"
+    ],
+    "customer_id": "C-101",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:30:28.663Z"
+  },
+  {
+    "payment_id": "PMT-1003",
+    "status": "misapplied",
+    "invoices": [
+      "NB-3401"
+    ],
+    "customer_id": "C-101",
+    "note": "applied to august, not september",
+    "system_status_at_review": "misapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:30:44.916Z"
+  },
+  {
+    "payment_id": "PMT-1004",
+    "status": "ok",
+    "invoices": [
+      "NB-3501"
+    ],
+    "customer_id": "C-101",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:30:51.822Z"
+  },
+  {
+    "payment_id": "PMT-1005",
+    "status": "wrong_account",
+    "invoices": [
+      "NB-3302"
+    ],
+    "customer_id": "C-102",
+    "note": "it shows east gate, but show harlow property group",
+    "system_status_at_review": "wrong_account",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:31:27.574Z"
+  },
+  {
+    "payment_id": "PMT-1006",
+    "status": "ok",
+    "invoices": [
+      "NB-3102"
+    ],
+    "customer_id": "C-102",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:31:45.972Z"
+  },
+  {
+    "payment_id": "PMT-1007",
+    "status": "ok",
+    "invoices": [
+      "NB-3202"
+    ],
+    "customer_id": "C-102",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:31:50.655Z"
+  },
+  {
+    "payment_id": "PMT-1008",
+    "status": "ok",
+    "invoices": [
+      "NB-3402"
+    ],
+    "customer_id": "C-102",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:31:56.571Z"
+  },
+  {
+    "payment_id": "PMT-1009",
+    "status": "ok",
+    "invoices": [
+      "NB-3103",
+      "NB-3203"
+    ],
+    "customer_id": "C-103",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:32:00.154Z"
+  },
+  {
+    "payment_id": "PMT-1010",
+    "status": "ok",
+    "invoices": [
+      "NB-3303"
+    ],
+    "customer_id": "C-103",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:32:06.119Z"
+  },
+  {
+    "payment_id": "PMT-1011",
+    "status": "unapplied",
+    "invoices": [
+      "NB-3403"
+    ],
+    "customer_id": "C-103",
+    "note": "credit memo should be applied to september invoice, not applied yet",
+    "system_status_at_review": "unapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:32:47.646Z"
+  },
+  {
+    "payment_id": "PMT-1012",
+    "status": "ok",
+    "invoices": [
+      "NB-3104"
+    ],
+    "customer_id": "C-104",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:32:53.490Z"
+  },
+  {
+    "payment_id": "PMT-1013",
+    "status": "ok",
+    "invoices": [
+      "NB-3204"
+    ],
+    "customer_id": "C-104",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:32:56.936Z"
+  },
+  {
+    "payment_id": "PMT-1014",
+    "status": "unapplied",
+    "invoices": [
+      "NB-3504"
+    ],
+    "customer_id": "C-104",
+    "note": "half of the 831 is not applied yet",
+    "system_status_at_review": "unapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:33:17.936Z"
+  },
+  {
+    "payment_id": "PMT-1015",
+    "status": "ok",
+    "invoices": [
+      "NB-3105"
+    ],
+    "customer_id": "C-105",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:33:27.512Z"
+  },
+  {
+    "payment_id": "PMT-1016",
+    "status": "ok",
+    "invoices": [
+      "NB-3205"
+    ],
+    "customer_id": "C-105",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:33:31.055Z"
+  },
+  {
+    "payment_id": "PMT-1017",
+    "status": "ok",
+    "invoices": [
+      "NB-3305"
+    ],
+    "customer_id": "C-105",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:33:34.286Z"
+  },
+  {
+    "payment_id": "PMT-1018",
+    "status": "ok",
+    "invoices": [
+      "NB-3106"
+    ],
+    "customer_id": "C-106",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:33:37.389Z"
+  },
+  {
+    "payment_id": "PMT-1019",
+    "status": "ok",
+    "invoices": [
+      "NB-3206",
+      "NB-3306"
+    ],
+    "customer_id": "C-106",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:33:40.486Z"
+  },
+  {
+    "payment_id": "PMT-1020",
+    "status": "ok",
+    "invoices": [
+      "NB-3406"
+    ],
+    "customer_id": "C-106",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:33:44.587Z"
+  },
+  {
+    "payment_id": "PMT-1021",
+    "status": "needs_human",
+    "invoices": [
+      "NB-3406"
+    ],
+    "customer_id": "C-106",
+    "note": "they paid twice, we need a human to start the refund",
+    "system_status_at_review": "needs_human",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:34:07.545Z"
+  },
+  {
+    "payment_id": "PMT-1022",
+    "status": "ok",
+    "invoices": [
+      "NB-3107",
+      "NB-3157"
+    ],
+    "customer_id": "C-107",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:34:15.125Z"
+  },
+  {
+    "payment_id": "PMT-1023",
+    "status": "misapplied",
+    "invoices": [
+      "NB-3307",
+      "NB-3357"
+    ],
+    "customer_id": "C-107",
+    "note": "applied to NB3207, NB3257, but applied NB3307 and NB3357",
+    "system_status_at_review": "misapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:34:47.750Z"
+  },
+  {
+    "payment_id": "PMT-1024",
+    "status": "misapplied",
+    "invoices": [
+      "NB-3407",
+      "NB-3457",
+      "NB-3507",
+      "NB-3557"
+    ],
+    "customer_id": "C-107",
+    "note": "has been applied NB3307, NB3357, should be applied to NB3507, NB3557",
+    "system_status_at_review": "misapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:35:27.799Z"
+  },
+  {
+    "payment_id": "PMT-1025",
+    "status": "ok",
+    "invoices": [
+      "NB-3108"
+    ],
+    "customer_id": "C-108",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:36:19.494Z"
+  },
+  {
+    "payment_id": "PMT-1026",
+    "status": "needs_human",
+    "invoices": [
+      "NB-3208"
+    ],
+    "customer_id": "C-108",
+    "note": "no evidence for discount providec (e.g. credit memo)",
+    "system_status_at_review": "needs_human",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:36:40.355Z"
+  },
+  {
+    "payment_id": "PMT-1027",
+    "status": "misapplied",
+    "invoices": [
+      "NB-3408"
+    ],
+    "customer_id": "C-108",
+    "note": "applied NB3608, but should be applied to NB3408, needs correction",
+    "system_status_at_review": "misapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:37:43.351Z"
+  },
+  {
+    "payment_id": "PMT-1028",
+    "status": "ok",
+    "invoices": [
+      "NB-3109"
+    ],
+    "customer_id": "C-109",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:37:48.299Z"
+  },
+  {
+    "payment_id": "PMT-1029",
+    "status": "wrong_account",
+    "invoices": [
+      "NB-3210"
+    ],
+    "customer_id": "C-110",
+    "note": "should have been applied to airport",
+    "system_status_at_review": "wrong_account",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:38:19.498Z"
+  },
+  {
+    "payment_id": "PMT-1030",
+    "status": "ok",
+    "invoices": [
+      "NB-3110"
+    ],
+    "customer_id": "C-110",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:38:24.725Z"
+  },
+  {
+    "payment_id": "PMT-1031",
+    "status": "ok",
+    "invoices": [
+      "NB-3310"
+    ],
+    "customer_id": "C-110",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:38:28.695Z"
+  },
+  {
+    "payment_id": "PMT-1032",
+    "status": "wrong_account",
+    "invoices": [
+      "NB-3409"
+    ],
+    "customer_id": "C-109",
+    "note": "should have been applied to downtown",
+    "system_status_at_review": "wrong_account",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:38:50.565Z"
+  },
+  {
+    "payment_id": "PMT-1033",
+    "status": "needs_human",
+    "invoices": [
+      "NB-3509",
+      "NB-3510"
+    ],
+    "customer_id": null,
+    "note": "No customer reference, memo says Marlow hospitality group for October. Should be applied to both accounts in October, amounts tally to 4,450+4,450",
+    "system_status_at_review": "needs_human",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:39:33.278Z"
+  },
+  {
+    "payment_id": "PMT-1034",
+    "status": "ok",
+    "invoices": [
+      "NB-3111"
+    ],
+    "customer_id": "C-111",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:39:41.341Z"
+  },
+  {
+    "payment_id": "PMT-1035",
+    "status": "needs_human",
+    "invoices": [
+      "NB-3211"
+    ],
+    "customer_id": "C-111",
+    "note": "prompt injection, needs human intervention",
+    "system_status_at_review": "unapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:40:10.124Z"
+  },
+  {
+    "payment_id": "PMT-1036",
+    "status": "ok",
+    "invoices": [
+      "NB-3112"
+    ],
+    "customer_id": "C-112",
+    "note": "",
+    "system_status_at_review": "ok",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:40:23.845Z"
+  },
+  {
+    "payment_id": "PMT-1037",
+    "status": "misapplied",
+    "invoices": [
+      "NB-3312"
+    ],
+    "customer_id": "C-112",
+    "note": "has been applied to NB3412, memo says NB3312. And single 1040 amount has been provided",
+    "system_status_at_review": "misapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:40:57.796Z"
+  },
+  {
+    "payment_id": "PMT-1038",
+    "status": "misapplied",
+    "invoices": [
+      "NB-3520"
+    ],
+    "customer_id": "C-112",
+    "note": "voided invoice should be applied to NB3520 instead",
+    "system_status_at_review": "misapplied",
+    "reviewed_under_version": null,
+    "reviewed_at": "2026-11-22T02:41:34.439Z"
+  }
+]
