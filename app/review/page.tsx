@@ -3,7 +3,8 @@ import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import { listFindings, type StoredFinding } from "@/src/db/findings";
 import { reviewQueue } from "@/src/view/filter";
-import { FindingStatus } from "../ui";
+import { FindingStatus, StatusBadge } from "../ui";
+import { ClickableRow } from "../nav";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,11 @@ export default async function ReviewPage() {
   // Biggest amounts first, so the most money at stake gets looked at first.
   const unsure = reviewQueue(all);
   const waiting = unsure.filter((f) => f.reviews.length === 0);
-  const done = unsure.filter((f) => f.reviews.length > 0);
+  // Latest decision first.
+  const reviewed = all
+    .filter((f) => f.reviews.length > 0)
+    .sort((a, b) => new Date(b.reviews[0].createdAt).getTime() - new Date(a.reviews[0].createdAt).getTime());
+  const agree = reviewed.filter((f) => f.reviews[0].reviewedStatus === f.status).length;
 
   return (
     <>
@@ -75,13 +80,56 @@ export default async function ReviewPage() {
         </>
       )}
 
-      {done.length > 0 && (
+      <h2>Manual review results</h2>
+      {reviewed.length === 0 ? (
+        <div className="empty">No decisions saved yet. They appear here as soon as you confirm or correct a finding.</div>
+      ) : (
         <>
-          <h2>Reviewed</h2>
-          <div className="queue">
-            {done.map((f) => (
-              <QueueItem key={f.paymentId} f={f} />
-            ))}
+          <p className="muted">
+            Every finding a person has decided, from the queue or from the findings list. {agree} of {reviewed.length} agree
+            with the system.
+          </p>
+          <div className="table-wrap">
+            <table className="compact">
+              <thead>
+                <tr>
+                  <th>Payment</th>
+                  <th>System said</th>
+                  <th>Your answer</th>
+                  <th>Belongs to</th>
+                  <th>Note</th>
+                  <th>Saved (UTC)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviewed.map((f) => {
+                  const r = f.reviews[0];
+                  const account = r.customerId ? ledger.customerById.get(r.customerId) : null;
+                  return (
+                    <ClickableRow key={f.paymentId} href={`/findings/${f.paymentId}`}>
+                      <td>
+                        <Link href={`/findings/${f.paymentId}`} className="row-link">
+                          {f.paymentId}
+                        </Link>
+                      </td>
+                      <td>
+                        <StatusBadge status={f.status} />
+                      </td>
+                      <td>
+                        <StatusBadge status={r.reviewedStatus} />
+                        {r.reviewedStatus !== f.status && <div className="row-note">Corrected</div>}
+                      </td>
+                      <td>
+                        <span className="mono">{r.invoices.join(", ")}</span>
+                        {account && <div className="row-note">{account.name}</div>}
+                      </td>
+                      <td style={{ fontSize: 13 }}>{r.note}</td>
+                      <td className="mono">{new Date(r.createdAt).toISOString().slice(0, 16).replace("T", " ")}</td>
+                    </ClickableRow>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </>
       )}

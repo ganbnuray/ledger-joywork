@@ -28,4 +28,8 @@ create table if not exists reviews (
 );
 
 create index if not exists reviews_payment_id on reviews (payment_id, created_at desc);
+
+-- Where the person says the money belongs. Added after the first version, so older databases get them too.
+alter table reviews add column if not exists invoices text[] not null default '{}';
+alter table reviews add column if not exists customer_id text;
 `;

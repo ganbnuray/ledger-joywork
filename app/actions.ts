@@ -17,11 +17,25 @@ export async function reviewFinding(formData: FormData) {
   const chosen = String(formData.get("status")) as Status;
   const note = String(formData.get("note") ?? "").trim().slice(0, 1000);
   const from = formData.get("from");
+  // Only a plain query string is accepted, so the redirect stays on this site.
+  const rawQuery = String(formData.get("query") ?? "");
+  const query = from === "review" ? "?from=review" : /^\?[\w=&%+.-]*$/.test(rawQuery) ? rawQuery : "";
 
   const status = action === "confirm" ? systemStatus : chosen;
   if (!STATUSES.includes(status)) throw new Error("Unknown status");
 
-  await addReview(paymentId, action, status, note);
+  // Where the person says the money belongs. Both must exist in the ledger.
+  const invoices = [...new Set(String(formData.get("invoices") ?? "").toUpperCase().match(/NB-\d{4}/g) ?? [])];
+  const unknown = invoices.filter((n) => !ledger.invoiceByNumber.has(n));
+  const customerId = String(formData.get("customerId") ?? "") || null;
+  const badAccount = customerId !== null && !ledger.customerById.has(customerId);
+  if (unknown.length > 0 || badAccount) {
+    const message = unknown.length > 0 ? `Not in the ledger: ${unknown.join(", ")}` : "Unknown account";
+    const sep = query ? "&" : "?";
+    redirect(`/findings/${paymentId}${query}${sep}error=${encodeURIComponent(message)}#review`);
+  }
+
+  await addReview(paymentId, action, status, note, invoices, customerId);
   revalidatePath("/", "layout");
 
   // From the review queue, move on to the next finding that still needs a look.
@@ -29,9 +43,7 @@ export async function reviewFinding(formData: FormData) {
     const next = reviewQueue(await listFindings(ledger)).find((f) => f.reviews.length === 0);
     redirect(next ? `/findings/${next.paymentId}?from=review` : "/review");
   }
-  // Stay in the same filtered list. Only a plain query string is accepted.
-  const query = String(formData.get("query") ?? "");
-  redirect(`/findings/${paymentId}${/^\?[\w=&%+.-]*$/.test(query) ? query : ""}`);
+  redirect(`/findings/${paymentId}${query}`);
 }
 
 export type EmailState = { text: string; read: ReadResult; result: EmailCheck } | null;

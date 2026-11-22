@@ -7,6 +7,8 @@ export type Review = {
   action: "confirm" | "correct";
   systemStatus: Status;
   reviewedStatus: Status;
+  invoices: string[]; // where the person says the money belongs, empty if not given
+  customerId: string | null; // the account the person says it belongs to
   note: string;
   createdAt: Date;
 };
@@ -113,6 +115,8 @@ export async function listFindings(ledger: Ledger): Promise<StoredFinding[]> {
       action: r.action,
       systemStatus: r.system_status,
       reviewedStatus: r.reviewed_status,
+      invoices: r.invoices ?? [],
+      customerId: r.customer_id,
       note: r.note,
       createdAt: r.created_at,
     });
@@ -131,12 +135,15 @@ export async function addReview(
   action: Review["action"],
   reviewedStatus: Status,
   note: string,
+  invoices: string[] = [],
+  customerId: string | null = null,
 ): Promise<void> {
   const db = pool();
   const { rows } = await db.query("select status from findings where payment_id = $1", [paymentId]);
   if (rows.length === 0) throw new Error(`No finding for ${paymentId}`);
   await db.query(
-    "insert into reviews (payment_id, action, system_status, reviewed_status, note) values ($1, $2, $3, $4, $5)",
-    [paymentId, action, rows[0].status, reviewedStatus, note],
+    `insert into reviews (payment_id, action, system_status, reviewed_status, note, invoices, customer_id)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
+    [paymentId, action, rows[0].status, reviewedStatus, note, invoices, customerId],
   );
 }

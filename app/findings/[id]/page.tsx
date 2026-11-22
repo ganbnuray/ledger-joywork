@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import type { Application } from "@/src/ledger/types";
-import { listFindings } from "@/src/db/findings";
+import { listFindings, type Review } from "@/src/db/findings";
 import { STATUSES, STATUS_HELP, STATUS_LABEL, flagLabel, needsReview } from "@/src/view/labels";
 import { filterFindings, filterQuery, reviewQueue, type FindingFilter } from "@/src/view/filter";
 import { reviewFinding } from "../../actions";
@@ -53,15 +53,26 @@ function ApplicationsTable({ applications, empty }: { applications: Application[
   );
 }
 
+function formatWhen(date: Date): string {
+  return new Date(date).toISOString().slice(0, 16).replace("T", " ");
+}
+
+// "NB-3302 on Harlow Property Group - Eastgate", or "" when the person did not say.
+function belongsTo(r: Review): string {
+  const account = r.customerId ? ledger.customerById.get(r.customerId)?.name : null;
+  if (r.invoices.length && account) return `${r.invoices.join(", ")} on ${account}`;
+  return r.invoices.join(", ") || account || "";
+}
+
 export default async function FindingPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<FindingFilter & { from?: string }>;
+  searchParams: Promise<FindingFilter & { from?: string; error?: string }>;
 }) {
   const { id } = await params;
-  const { from, ...filter } = await searchParams;
+  const { from, error, ...filter } = await searchParams;
   const all = await listFindings(ledger);
   const finding = all.find((f) => f.paymentId === id);
   const payment = ledger.payments.find((p) => p.id === id);
@@ -80,6 +91,12 @@ export default async function FindingPage({
   const index = list.findIndex((f) => f.paymentId === id);
   const prev = index > 0 ? list[index - 1] : null;
   const next = index >= 0 && index < list.length - 1 ? list[index + 1] : null;
+  const latest = finding.reviews[0] ?? null;
+  const defaultAccount = latest ? (latest.customerId ?? "") : (finding.likelyCustomerId ?? payment.customerId ?? "");
+  const defaultInvoices = (
+    latest ? latest.invoices : finding.status === "ok" ? payment.applications.map((a) => a.invoice) : finding.likelyInvoices
+  ).join(", ");
+
   const listName = fromReview ? "in the review queue" : query ? "in this filtered list" : "";
 
   // The account to show context for: where it was recorded, or where it most likely belongs.
@@ -126,6 +143,30 @@ export default async function FindingPage({
         )}
       </div>
       <p className="muted">{STATUS_HELP[finding.status]}</p>
+
+      <div className={`review-result${latest ? "" : " pending"}`}>
+        <div className="fact-label">Manual review result</div>
+        {latest ? (
+          <>
+            <div className="review-result-main">
+              <StatusBadge status={latest.reviewedStatus} />
+              <span>
+                {latest.reviewedStatus === finding.status ? "Agrees with the system" : `The system said ${STATUS_LABEL[finding.status]}`}
+              </span>
+              {belongsTo(latest) && <span>· Belongs to {belongsTo(latest)}</span>}
+            </div>
+            {latest.note && <div>&ldquo;{latest.note}&rdquo;</div>}
+            <div className="muted" style={{ fontSize: 12 }}>
+              Saved {formatWhen(latest.createdAt)} UTC
+              {finding.reviews.length > 1 ? ` · ${finding.reviews.length} reviews in the history below` : ""}
+            </div>
+          </>
+        ) : (
+          <div>
+            Not reviewed yet. <a href="#review">Review it</a>
+          </div>
+        )}
+      </div>
 
       <div className="facts">
         <div className="fact">
@@ -282,7 +323,8 @@ export default async function FindingPage({
         </>
       )}
 
-      <h2>Review</h2>
+      <h2 id="review">Review</h2>
+      {error && <div className="notice bad">Not saved. {error}.</div>}
       <div className="panel">
         <form action={reviewFinding} className="review-form">
           <input type="hidden" name="paymentId" value={finding.paymentId} />
@@ -290,11 +332,12 @@ export default async function FindingPage({
           {fromReview ? <input type="hidden" name="from" value="review" /> : <input type="hidden" name="query" value={query} />}
           <p>
             The system says <StatusBadge status={finding.status} />. Confirm it, or pick the status you think is right.
+            Say where the money belongs if it differs from the system&apos;s suggestion.
           </p>
           <div className="row">
             <label>
-              Correct status
-              <select name="status" defaultValue={finding.reviewedStatus ?? finding.status}>
+              Status
+              <select name="status" defaultValue={latest?.reviewedStatus ?? finding.status}>
                 {STATUSES.map((s) => (
                   <option key={s} value={s}>
                     {STATUS_LABEL[s]}
@@ -302,8 +345,25 @@ export default async function FindingPage({
                 ))}
               </select>
             </label>
+            <label>
+              Belongs to account
+              <select name="customerId" defaultValue={defaultAccount}>
+                <option value="">Not sure</option>
+                {ledger.customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.id})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ flex: 1, minWidth: 200 }}>
+              Belongs to invoices
+              <input name="invoices" defaultValue={defaultInvoices} placeholder="NB-3509, NB-3510" />
+            </label>
+          </div>
+          <div className="row">
             <label style={{ flex: 1, minWidth: 220 }}>
-              Note (optional)
+              Note
               <input name="note" placeholder="Why, or what you checked" />
             </label>
           </div>
@@ -312,7 +372,7 @@ export default async function FindingPage({
               Confirm {STATUS_LABEL[finding.status]}
             </button>
             <button type="submit" name="action" value="correct" className="secondary">
-              Save corrected status
+              Save with the status above
             </button>
             {fromReview && (
               <Link href="/review" className="button secondary">
@@ -326,28 +386,32 @@ export default async function FindingPage({
       {finding.reviews.length > 0 && (
         <>
           <h2>Review history</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Action</th>
-                <th>Status</th>
-                <th>Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              {finding.reviews.map((r, i) => (
-                <tr key={i}>
-                  <td className="mono">{new Date(r.createdAt).toISOString().slice(0, 16).replace("T", " ")}</td>
-                  <td>{r.action === "confirm" ? "Confirmed" : `Corrected from ${STATUS_LABEL[r.systemStatus]}`}</td>
-                  <td>
-                    <StatusBadge status={r.reviewedStatus} />
-                  </td>
-                  <td>{r.note || <span className="muted">No note</span>}</td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>When (UTC)</th>
+                  <th>Action</th>
+                  <th>Status</th>
+                  <th>Belongs to</th>
+                  <th>Note</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {finding.reviews.map((r, i) => (
+                  <tr key={i}>
+                    <td className="mono">{formatWhen(r.createdAt)}</td>
+                    <td>{r.action === "confirm" ? "Confirmed" : r.reviewedStatus === r.systemStatus ? "Saved" : `Corrected from ${STATUS_LABEL[r.systemStatus]}`}</td>
+                    <td>
+                      <StatusBadge status={r.reviewedStatus} />
+                    </td>
+                    <td>{belongsTo(r)}</td>
+                    <td>{r.note || <span className="muted">No note</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </>

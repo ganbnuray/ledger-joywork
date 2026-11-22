@@ -692,3 +692,26 @@ table.compact td.mono {
   font-size: 12px;
   color: var(--muted);
 }
+
+.review-result {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text);
+  background: var(--surface);
+  padding: 10px 14px;
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.review-result.pending {
+  border-left-color: var(--border);
+  color: var(--muted);
+}
+
+.review-result-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
