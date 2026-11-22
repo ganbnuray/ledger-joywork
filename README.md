@@ -6,6 +6,62 @@ The full task is in [`docs/SPEC.md`](docs/SPEC.md). The input ledger is [`data/l
 
 Status: work in progress.
 
+## Setup
+
+Requires Node 20 or newer and a Postgres database.
+
+```bash
+npm install
+cp .env.example .env
+```
+
+Then fill in `.env`:
+
+| Variable | Needed for | If missing |
+|---|---|---|
+| `DATABASE_URL` | The web app and `npm run db:seed` | The web app cannot start |
+| `ANTHROPIC_API_KEY` | Reading emails with the model | Emails are read with rules only, and the app says so |
+
+## Commands
+
+### Web app
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Starts the app in development mode at http://localhost:3000, reloading on every change. |
+| `npm run build` | Builds the app for production. |
+| `npm start` | Runs the production build from `npm run build` at http://localhost:3000. |
+| `npm run db:seed` | Creates the tables if needed, runs the matcher and writes all 38 findings to the database. Reviews already in the database are kept. Reads `DATABASE_URL` from `.env`. |
+
+The app also seeds itself on the first page load if the database is empty, so `db:seed` is only needed to rerun the matcher after changing its rules.
+
+### Matcher and email checker in the terminal
+
+These read `data/ledger.json` directly. They need no database and change nothing.
+
+| Command | What it does |
+|---|---|
+| `npm run match` | Prints one line per payment or credit: id, status, account it was recorded on, confidence, amount involved, and the invoices the money most likely belongs to. Ends with a count per status. |
+| `npm run match -- --verbose` | The same, plus the evidence behind each finding. |
+| `npm run check-email -- data/emails/*.txt` | Checks each email file against the ledger: the account, matching payments, each invoice's answer (paid, still owed, hold reminder) and a summary. Pass any `.txt` file with the email text. |
+
+`check-email` uses the model only if `ANTHROPIC_API_KEY` is set in your shell, for example `export ANTHROPIC_API_KEY=...` first. Without it, the output says "read by rules".
+
+### Checks
+
+| Command | What it does |
+|---|---|
+| `npm test` | Runs all tests once: matcher statuses for every discussed case, balances, memo parsing, email reading and the model fallback. |
+| `npm run typecheck` | Checks the TypeScript types without building. |
+
+### AI session logs
+
+| Command | What it does |
+|---|---|
+| `python3 scripts/export-ai-log.py <session.jsonl> <output.md> ["title"]` | Turns a Claude Code session transcript into a readable Markdown log for `ai-logs/`. Removes system reminders, Gmail addresses and API keys, and cuts tool results longer than 4,000 characters. The title is optional. |
+
+Claude Code keeps session transcripts in `~/.claude/projects/<project folder>/<session id>.jsonl`.
+
 ## Repository layout
 
 | Path | What it holds |
@@ -13,6 +69,13 @@ Status: work in progress.
 | `docs/SPEC.md` | The take-home spec |
 | `data/ledger.json` | The ledger: customers, invoices, payments and credits |
 | `data/emails/` | The three sample "we already paid" emails |
+| `src/ledger/` | Loading the ledger (money in cents) and computing balances |
+| `src/matcher/` | The rules that give each payment and credit its finding |
+| `src/email/` | Reading a pasted email (rules, plus the model as a helper) and checking it against the ledger |
+| `src/db/` | Postgres tables for findings and reviews |
+| `app/` | The web app: findings, review queue, email checker |
+| `scripts/` | The terminal commands above |
+| `tests/` | Tests, using real payments from the ledger |
 | `ai-logs/` | Full transcripts of the AI sessions used to build this |
 
 ## Still to write
