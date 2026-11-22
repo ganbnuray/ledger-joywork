@@ -618,3 +618,54 @@ tbody tr.link-row {
   opacity: 0.4;
   cursor: default;
 }
+
+tr.highlight td {
+  background: #f1eee4;
+}
+
+tr.highlight td:first-child {
+  box-shadow: inset 3px 0 0 var(--text);
+}
+
+details.sister {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  margin-bottom: 8px;
+}
+
+details.sister summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+details.sister summary::-webkit-details-marker {
+  display: none;
+}
+
+details.sister summary::before {
+  content: "▸";
+  color: var(--muted);
+  width: 10px;
+}
+
+details.sister[open] summary::before {
+  content: "▾";
+}
+
+details.sister summary:hover {
+  background: var(--row-hover);
+}
+
+.sister-body {
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--border);
+}
+
+.sister-body table {
+  background: var(--bg);
+}

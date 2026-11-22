@@ -9,6 +9,9 @@ import { filterFindings, filterQuery, reviewQueue, type FindingFilter } from "@/
 import { reviewFinding } from "../../actions";
 import { FindingStatus, StatusBadge } from "../../ui";
 import { Pager } from "../../nav";
+import { computeBalances, recordedBalances } from "@/src/ledger/balances";
+import { intendedApplicationsFor } from "@/src/matcher/match";
+import { InvoicesTable, PaymentsTable } from "./account";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +81,21 @@ export default async function FindingPage({
   const prev = index > 0 ? list[index - 1] : null;
   const next = index >= 0 && index < list.length - 1 ? list[index + 1] : null;
   const listName = fromReview ? "in the review queue" : query ? "in this filtered list" : "";
+
+  // The account to show context for: where it was recorded, or where it most likely belongs.
+  const firstLikely = finding.likelyInvoices.map((n) => ledger.invoiceByNumber.get(n)).find(Boolean);
+  const homeAccount = account ?? likelyAccount ?? (firstLikely ? ledger.customerById.get(firstLikely.customerId) : null);
+  const sisters = homeAccount ? ledger.customers.filter((c) => c.parent === homeAccount.parent && c.id !== homeAccount.id) : [];
+
+  const byId = new Map(all.map((f) => [f.paymentId, f]));
+  const recorded = recordedBalances(ledger);
+  const corrected = computeBalances(ledger, intendedApplicationsFor(ledger, all));
+  const recordedHere = new Set(payment.applications.map((a) => a.invoice));
+  const meantHere = new Set(
+    finding.status === "ok"
+      ? payment.applications.map((a) => a.invoice)
+      : (finding.intendedApplications?.map((a) => a.invoice) ?? finding.likelyInvoices),
+  );
   const backHref = fromReview ? "/review" : `/findings${query}`;
 
   return (
@@ -151,7 +169,7 @@ export default async function FindingPage({
       <h2>Where the money is and where it belongs</h2>
       <div className="split">
         <div>
-          <p className="muted">Recorded in the books</p>
+          <p className="muted">Applications: where the books record it</p>
           <ApplicationsTable applications={payment.applications} empty="Not applied to any invoice." />
         </div>
         <div>
@@ -191,6 +209,76 @@ export default async function FindingPage({
       <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
         Decided by {finding.decidedBy === "rule" ? "rules in code" : "the model"}, confidence {finding.confidence}.
       </p>
+
+      {homeAccount && (
+        <>
+          <h2>
+            Invoices on {homeAccount.name} ({homeAccount.id})
+          </h2>
+          {!account && (
+            <p className="muted">No account was recorded for this payment. Showing the account it most likely belongs to.</p>
+          )}
+          <p className="muted" style={{ fontSize: 13 }}>
+            &ldquo;After fixes&rdquo; is the balance once every misapplied, wrong account and unapplied finding is corrected.
+            Highlighted rows are where this payment is recorded or belongs.
+          </p>
+          <InvoicesTable
+            account={homeAccount}
+            recorded={recorded}
+            corrected={corrected}
+            recordedHere={recordedHere}
+            meantHere={meantHere}
+          />
+
+          <h2>Other payments on {homeAccount.name}</h2>
+          <PaymentsTable account={homeAccount} currentId={payment.id} findings={byId} query={query} />
+
+          {sisters.length > 0 && (
+            <>
+              <h2>Sister locations in {homeAccount.parent}</h2>
+              <p className="muted" style={{ fontSize: 13 }}>
+                Other accounts of the same organization. Money often lands on the wrong one.
+              </p>
+              {sisters.map((s) => {
+                const touched = ledger.invoices.some(
+                  (inv) => inv.customerId === s.id && (recordedHere.has(inv.number) || meantHere.has(inv.number)),
+                );
+                const open = ledger.invoices.filter(
+                  (inv) => inv.customerId === s.id && inv.status === "posted" && corrected.get(inv.number)!.balance > 0,
+                );
+                const owed = open.reduce((sum, inv) => sum + corrected.get(inv.number)!.balance, 0);
+                return (
+                  <details key={s.id} className="sister" open={touched}>
+                    <summary>
+                      <span style={{ fontWeight: 500 }}>
+                        {s.name} ({s.id})
+                      </span>
+                      <span className="muted">
+                        {open.length} open after fixes, {formatCents(owed)}
+                      </span>
+                      {touched && <span className="tag">This payment belongs here</span>}
+                    </summary>
+                    <div className="sister-body">
+                      <p className="muted">Invoices</p>
+                      <InvoicesTable
+                        account={s}
+                        recorded={recorded}
+                        corrected={corrected}
+                        recordedHere={recordedHere}
+                        meantHere={meantHere}
+                      />
+                      <p className="muted" style={{ marginTop: 14 }}>
+                        Payments
+                      </p>
+                      <PaymentsTable account={s} currentId={payment.id} findings={byId} query={query} />
+                    </div>
+                  </details>
+                );
+              })}
+            </>
+          )}
+        </>
+      )}
 
       <h2>Review</h2>
       <div className="panel">
