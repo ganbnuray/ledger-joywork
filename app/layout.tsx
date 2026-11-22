@@ -4,6 +4,7 @@ import { ledger } from "@/src/ledger/bundled";
 import { MATCHER_VERSION, versionNote } from "@/src/matcher/versions";
 import { viewedVersion } from "@/src/view/version";
 import { VersionSwitcher } from "./VersionSwitcher";
+import { NavLinks } from "./NavLinks";
 import { setViewedVersion } from "./actions";
 import "./globals.css";
 
@@ -23,16 +24,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href="/findings" className="brand">
               Payment Matcher
             </Link>
-            <nav className="nav">
-              <Link href="/findings">Findings</Link>
-              <Link href="/review">Review queue</Link>
-              <Link href="/email">Check an email</Link>
-              <Link href="/evaluation">Evaluation</Link>
-              <Link href="/versions">Versions</Link>
-            </nav>
-            <span className="asof">
-              {ledger.business} · ledger as of {ledger.asOf}
-            </span>
+            <NavLinks />
             {viewed && <VersionSwitcher versions={viewed.all} current={MATCHER_VERSION} viewed={viewed.version} />}
           </div>
         </header>
@@ -53,6 +45,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         )}
         <main className="page">{children}</main>
+        <footer className="footer">
+          {ledger.business} · ledger as of {ledger.asOf}
+        </footer>
       </body>
     </html>
   );

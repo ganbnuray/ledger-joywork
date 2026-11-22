@@ -10,11 +10,11 @@ export function VersionSwitcher({ versions, current, viewed }: { versions: strin
   return (
     <form ref={form} action={setViewedVersion} className="version-switch">
       <label>
-        Version
+        <span className="sr-only">System version</span>
         <select name="version" defaultValue={viewed} onChange={() => form.current?.requestSubmit()}>
           {versions.map((v) => (
             <option key={v} value={v}>
-              {v}
+              Version {v}
               {v === current ? " (current)" : ""}
             </option>
           ))}
