@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ledger } from "@/src/ledger/bundled";
-import { listFindings } from "@/src/db/findings";
+import { exportLabels, listFindings } from "@/src/db/findings";
+import { CopyLabels } from "./CopyLabels";
 import { evaluate } from "@/src/eval/metrics";
 import { STATUSES, STATUS_LABEL } from "@/src/view/labels";
 import { viewedVersion } from "@/src/view/version";
@@ -23,6 +24,7 @@ export default async function EvaluationPage() {
   for (const f of findings) if (f.reviews[0]) labels.set(f.paymentId, f.reviews[0].reviewedStatus);
   const predicted = new Map(findings.map((f) => [f.paymentId, f.status]));
   const e = evaluate(predicted, labels);
+  const labelsFile = e.labeledCount > 0 ? JSON.stringify(await exportLabels(), null, 2) + "\n" : "";
 
   return (
     <>
@@ -43,6 +45,7 @@ export default async function EvaluationPage() {
             </span>
           </p>
         )}
+        {e.labeledCount > 0 && <CopyLabels text={labelsFile} />}
       </div>
 
       {e.labeledCount === 0 ? (
