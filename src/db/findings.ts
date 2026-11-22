@@ -1,7 +1,8 @@
 import { Pool } from "pg";
 import { schema } from "./schema";
 import type { Ledger } from "../ledger/types";
-import { matchAll, type Finding, type Status } from "../matcher/match";
+import { MATCHER_VERSION, matchAll, type Finding, type Status } from "../matcher/match";
+import { screenMemos } from "../matcher/screen";
 
 export type Review = {
   action: "confirm" | "correct";
@@ -64,9 +65,13 @@ export async function saveFindings(findings: Finding[]): Promise<void> {
       ],
     );
   }
+  await db.query(
+    "insert into meta (key, value) values ('matcher_version', $1) on conflict (key) do update set value = excluded.value",
+    [MATCHER_VERSION],
+  );
 }
 
-// Creates the tables and runs the matcher the first time the app starts on an empty database.
+// Creates the tables, and runs the matcher when the database is empty or was written by an older matcher.
 let ready: Promise<void> | null = null;
 export function ensureReady(ledger: Ledger): Promise<void> {
   if (!ready) {
@@ -74,7 +79,11 @@ export function ensureReady(ledger: Ledger): Promise<void> {
       const db = pool();
       await db.query(schema);
       const { rows } = await db.query("select count(*)::int as n from findings");
-      if (rows[0].n < ledger.payments.length) await saveFindings(matchAll(ledger));
+      const version = await db.query("select value from meta where key = 'matcher_version'");
+      const stale = version.rows[0]?.value !== MATCHER_VERSION;
+      if (rows[0].n < ledger.payments.length || stale) {
+        await saveFindings((await screenMemos(ledger, matchAll(ledger))).findings);
+      }
     })().catch((error) => {
       ready = null;
       throw error;

@@ -1,9 +1,11 @@
 import { loadLedger, formatCents } from "../src/ledger/load";
 import { matchAll } from "../src/matcher/match";
+import { screenMemos } from "../src/matcher/screen";
 
 // Prints one line per finding, and the evidence with --verbose.
 const ledger = loadLedger();
-const findings = matchAll(ledger);
+// With ANTHROPIC_API_KEY set, the model also checks every memo for injection attempts.
+const { findings, notes } = await screenMemos(ledger, matchAll(ledger));
 const verbose = process.argv.includes("--verbose");
 
 for (const f of findings) {
@@ -17,3 +19,4 @@ for (const f of findings) {
 const counts: Record<string, number> = {};
 for (const f of findings) counts[f.status] = (counts[f.status] ?? 0) + 1;
 console.log("\n", counts);
+for (const n of notes) console.log(n);

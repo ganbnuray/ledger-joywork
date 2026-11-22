@@ -32,4 +32,7 @@ create index if not exists reviews_payment_id on reviews (payment_id, created_at
 -- Where the person says the money belongs. Added after the first version, so older databases get them too.
 alter table reviews add column if not exists invoices text[] not null default '{}';
 alter table reviews add column if not exists customer_id text;
+
+-- Which version of the matcher wrote the findings. A new version reruns it once.
+create table if not exists meta (key text primary key, value text not null);
 `;

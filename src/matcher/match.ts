@@ -4,6 +4,9 @@ import { openInvoices, recordedBalances, type InvoiceBalance } from "../ledger/b
 import { parseMemo, type MemoSignals } from "./memo";
 import { appliedTotal, findDuplicateOf, numericFlags, replacementFor, type Flag } from "./flags";
 
+// Bump this when a rule changes, so stored findings are recomputed on the next start.
+export const MATCHER_VERSION = "2";
+
 export type Status = "ok" | "misapplied" | "wrong_account" | "unapplied" | "needs_human";
 
 export type Finding = {
@@ -16,7 +19,7 @@ export type Finding = {
   intendedApplications: Application[] | null; // where the money should sit, if we can say
   evidence: string[];
   flags: Flag[];
-  decidedBy: "rule";
+  decidedBy: "rule" | "model";
   confidence: "high" | "low";
 };
 
@@ -96,7 +99,26 @@ function describeInvoices(invoices: Invoice[]): string {
   return invoices.map((i) => `${i.number} (${i.description})`).join(", ");
 }
 
+// A memo that tries to instruct the system is an attack on the books, not a payment detail.
+// Whatever the numbers say, a person has to look at it. The numbers-based result is kept
+// in the evidence and as the suggestion, so the reviewer still sees where the money likely goes.
+export function holdForInjection(f: Finding, decidedBy: "rule" | "model", reason?: string): Finding {
+  if (f.status === "needs_human" && f.flags.some((x) => x.kind === "suspicious_memo")) return f;
+  const flags = f.flags.some((x) => x.kind === "suspicious_memo") ? f.flags : [...f.flags, { kind: "suspicious_memo" as const }];
+  const evidence = [...f.evidence];
+  if (reason) evidence.push(`The model flagged the memo as an attempt to instruct the system: ${reason}`);
+  evidence.push(
+    `Set to needs a person because the memo looks like an injection attempt. From the numbers alone it would be ${f.status}${f.likelyInvoices.length ? `, most likely ${f.likelyInvoices.join(", ")}` : ""}.`,
+  );
+  return { ...f, status: "needs_human", confidence: "low", decidedBy, flags, evidence };
+}
+
 export function matchPayment(p: Payment, ledger: Ledger, balances: Map<string, InvoiceBalance> = recordedBalances(ledger)): Finding {
+  const finding = matchByNumbers(p, ledger, balances);
+  return parseMemo(p.memo, ledger).suspicious ? holdForInjection(finding, "rule") : finding;
+}
+
+function matchByNumbers(p: Payment, ledger: Ledger, balances: Map<string, InvoiceBalance>): Finding {
   const parsed = parseMemo(p.memo, ledger);
   const signals = parsed.suspicious ? NO_SIGNALS : parsed;
   const flags = numericFlags(p, ledger);

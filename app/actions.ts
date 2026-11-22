@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ledger } from "@/src/ledger/bundled";
 import { addReview, listFindings } from "@/src/db/findings";
-import { matchAll, type Status } from "@/src/matcher/match";
+import type { Status } from "@/src/matcher/match";
 import { readEmail, type ReadResult } from "@/src/email/model";
 import { checkEmail, type EmailCheck } from "@/src/email/check";
 import { STATUSES } from "@/src/view/labels";
@@ -52,8 +52,8 @@ export async function checkEmailAction(_prev: EmailState, formData: FormData): P
   const text = String(formData.get("email") ?? "").slice(0, 20_000);
   if (text.trim() === "") return null;
   const read = await readEmail(text, ledger);
-  // The email check uses the matcher's own findings, not the review history,
-  // so its answer always traces back to the ledger.
-  const result = checkEmail(read.claims, ledger, matchAll(ledger));
+  // The email check uses the system's stored findings (rules plus the model's memo check),
+  // not the review history, so its answer always traces back to the ledger.
+  const result = checkEmail(read.claims, ledger, await listFindings(ledger));
   return { text, read, result };
 }

@@ -68,7 +68,7 @@ describe("statuses for the cases we discussed", () => {
     ["PMT-1032", "wrong_account", "Downtown payment recorded on Airport"],
     ["PMT-1011", "unapplied", "storm credit never applied"],
     ["PMT-1014", "unapplied", "two months paid, one applied"],
-    ["PMT-1035", "unapplied", "unapplied money with a suspicious memo"],
+    ["PMT-1035", "needs_human", "memo is an injection attempt"],
     ["PMT-1021", "needs_human", "duplicate of PMT-1020"],
     ["PMT-1026", "needs_human", "short payment with a claimed discount"],
     ["PMT-1033", "needs_human", "wire with no account"],
@@ -112,10 +112,18 @@ describe("details of findings", () => {
     expect(f.confidence).toBe("low");
   });
 
-  it("does not take the suspicious memo's word for anything", () => {
+  it("sends an injection attempt to a person, but keeps what the numbers say", () => {
     const f = finding("PMT-1035");
+    expect(f.status).toBe("needs_human");
     expect(f.flags.some((x) => x.kind === "suspicious_memo")).toBe(true);
     expect(f.amount).toBe(toCents(689));
+    expect(f.likelyInvoices).toEqual(["NB-3211"]);
+    expect(f.evidence.join(" ")).toContain("From the numbers alone it would be unapplied");
+  });
+
+  it("never lets the memo mark the invoices it names as paid", () => {
+    const corrected = computeBalances(ledger, intendedApplicationsFor(ledger, findings));
+    for (const n of ["NB-3211", "NB-3311", "NB-3411"]) expect(corrected.get(n)!.state, n).toBe("open");
   });
 
   it("sends every needs_human finding to review with low confidence", () => {

@@ -33,7 +33,9 @@ Then fill in `.env`:
 | `npm start` | Runs the production build from `npm run build` at http://localhost:3000. |
 | `npm run db:seed` | Creates the tables if needed, runs the matcher and writes all 38 findings to the database. Reviews already in the database are kept. Reads `DATABASE_URL` from `.env`. |
 
-The app also seeds itself on the first page load if the database is empty, so `db:seed` is only needed to rerun the matcher after changing its rules.
+The app also seeds itself on the first page load if the database is empty, or if the stored findings come from an older matcher (`MATCHER_VERSION` in `src/matcher/match.ts`). So after changing a rule, bump that version and the deployed app recomputes the findings once, keeping all reviews.
+
+With `ANTHROPIC_API_KEY` set, seeding also has the model check every memo for injection attempts. A flagged memo sends its payment to "needs a person". The model can add this flag but never remove one the rules raised.
 
 ### Matcher and email checker in the terminal
 
@@ -41,7 +43,7 @@ These read `data/ledger.json` directly. They need no database and change nothing
 
 | Command | What it does |
 |---|---|
-| `npm run match` | Prints one line per payment or credit: id, status, account it was recorded on, confidence, amount involved, and the invoices the money most likely belongs to. Ends with a count per status. |
+| `npm run match` | Runs the rules (and the model's memo check, if `ANTHROPIC_API_KEY` is set in your shell) and prints one line per payment or credit: id, status, account it was recorded on, confidence, amount involved, and the invoices the money most likely belongs to. Ends with a count per status. |
 | `npm run match -- --verbose` | The same, plus the evidence behind each finding. |
 | `npm run check-email -- data/emails/*.txt` | Checks each email file against the ledger: the account, matching payments, each invoice's answer (paid, still owed, hold reminder) and a summary. Pass any `.txt` file with the email text. |
 
