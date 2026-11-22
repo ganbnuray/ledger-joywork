@@ -33,6 +33,16 @@ export default async function EvaluationPage() {
           {e.labeledCount} of {findings.length} payments are labeled, and the system agrees on {e.agreedCount}. Switch the
           version in the top bar to score another version against the same labels.
         </p>
+        {e.labeledCount > 0 && (
+          <p style={{ marginTop: 10 }}>
+            <a href="/evaluation/labels.json" className="button secondary" download>
+              Download labels.json
+            </a>
+            <span className="muted" style={{ fontSize: 13, marginLeft: 10 }}>
+              Save it as data/labels.json in the repo and commit it.
+            </span>
+          </p>
+        )}
       </div>
 
       {e.labeledCount === 0 ? (

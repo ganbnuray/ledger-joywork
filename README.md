@@ -225,7 +225,7 @@ These read `data/ledger.json` directly. They need no database and change nothing
 
 | Command | What it does |
 |---|---|
-| `npm run labels:export` | Writes the latest manual review of each payment to `data/labels.json`. Reads `DATABASE_URL` from `.env`, so point it at the database that holds the reviews (the production one on Vercel). |
+| `npm run labels:export` | Writes the latest manual review of each payment to `data/labels.json`. Reads `DATABASE_URL` from `.env`, so point it at the database that holds the reviews. Without the connection string, use the Download labels.json button on the Evaluation page. |
 
 ### AI session logs
 
