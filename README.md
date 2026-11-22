@@ -2,9 +2,141 @@
 
 Finds payments and credits recorded against the wrong invoice or account, so a person can fix the books before a customer who already paid gets chased.
 
-The full task is in [`docs/SPEC.md`](docs/SPEC.md). The input ledger is [`data/ledger.json`](data/ledger.json) (12 accounts, 79 invoices, 38 payments and credits, as of November 20, 2026).
+Live app: ADD_DEPLOYED_URL
 
-Status: work in progress.
+The task is in [`docs/SPEC.md`](docs/SPEC.md). The input is [`data/ledger.json`](data/ledger.json): 12 accounts, 79 invoices, and 38 payments and credits, as of November 20, 2026. The current version gives 23 ok, 6 misapplied, 3 wrong account, 2 unapplied and 4 needs a person.
+
+## How the system fits together
+
+```mermaid
+flowchart LR
+    ledger[ledger.json] --> rules[Rules in code]
+    rules --> screen[Model checks memos]
+    screen --> db[(Postgres)]
+    db --> app[Web app]
+    app -- confirm or correct --> db
+    email[Pasted email] --> read[Rules and model read it]
+    read --> check[Checked against the ledger]
+    check --> app
+```
+
+1. The rules read each payment, its memo and its applications, and give it one finding: a status, the invoice and account the money most likely belongs to, the amount involved, and the evidence.
+2. The model reads each memo once more, only to spot attempts to instruct the system. It can send a payment to a person but cannot clear anything the rules flagged.
+3. Postgres stores the findings, the findings of every older version, and every manual review.
+4. The web app has the findings list, a review queue, a page per payment, an email checker and a page that compares versions.
+5. A pasted email is read by the rules and the model into a fixed set of fields. Code then checks those fields against the ledger and the findings. The email never decides the answer.
+
+### Which decisions the model makes, and which plain code makes
+
+| Decision | Made by |
+|---|---|
+| Balances, money in cents, which invoices are open | Code |
+| Invoice numbers, months, location names and discount words in a memo | Code |
+| Flags: over applied, void invoice, invoice issued after the payment, duplicate, no account | Code |
+| The status of every payment and the fix it proposes | Code |
+| Whether a memo tries to instruct the system | Code (keyword rule) and the model (second check, can only add) |
+| What a pasted email claims: invoices, references, dates, amounts, months | Code and the model. The model's values are checked against the ledger and the ones that fail are dropped |
+| Whether an invoice in an email is paid, still owed, or needs its reminder held | Code |
+| Anything a reviewer confirms or corrects | A person |
+
+The model never sees the findings and never decides what is owed. I kept it to reading free text because everything else can be checked with arithmetic, and arithmetic is easier to test and explain.
+
+## What I verified, and how
+
+- 70 automated tests (`npm test`). The matcher tests use real payments from the ledger, one or more per case: wrong month (PMT-1003, PMT-1027), a chain shifted by a month (PMT-1023, PMT-1024), sister accounts swapped (PMT-1029, PMT-1032), a payment on the head office meant for Eastgate (PMT-1005), a credit never applied (PMT-1011), a void invoice (PMT-1038), a double application (PMT-1037), a duplicate (PMT-1021), a claimed discount (PMT-1026), a wire with no account (PMT-1033) and the injection memo (PMT-1035).
+- Balances after fixes. For Orchard Lane the tests check that October ends up paid and July still owed, which is the opposite of what the books show. No invoice may end up overpaid after the fixes.
+- The three sample emails give the expected answers: Orchard Lane is partly right (October paid, July owed), Eastgate is right (hold NB-3302), Juniper is right (hold NB-3403).
+- The model paths. The tests replace the model with a fake one that times out, throws, or returns junk or invented values, and check that the rules result stands each time.
+- The web app. Claude drove a real browser (Playwright) through every page and I went over the screenshots: filters, search, review queue, confirm and correct, the email checker and the versions page.
+- The upgrade from version 1 to version 2. We built a copy of a version 1 database with reviews in the old table layout, started the new app on it, and checked that no review was lost and both versions were stored.
+
+### Precision and recall
+
+Not done yet. The spec asks me to label all 38 payments and credits myself and compare. The review form on each payment page stores exactly what a label needs (status, invoices, account, note), so the plan is to review all 38 in the app, export the reviews as `data/labels.json`, and show precision and recall per status on a page. The matcher was built from cases I worked out by hand before writing code, so for now its agreement with my own reading is high by construction. That is why an honest comparison needs labels made separately.
+
+### Where the system is wrong, and why
+
+- It trusts the memo. If a customer types the wrong invoice number and the amount matches (most invoices for an account have the same amount), the system calls a correct payment misapplied. The amount check lowers confidence only when the amounts differ.
+- The keyword rule for injection attempts is a short list of phrases. The model check covers more, but a carefully written memo could pass both. If that happens the memo is used as evidence of intent, so it could point the money to the wrong invoice. It still cannot change the arithmetic.
+- When there is no memo and money is unapplied, the suggestion is the oldest open invoice. That is a guess, which is why those findings get low confidence.
+- A duplicate means the same account, amount and memo invoice within 7 days. The 7 is my choice and would miss a duplicate paid a month later.
+- Month names without a year are read as 2026, the year of the ledger.
+- "After fixes" balances and the email checker use the system's findings, not the reviewers' corrections. A person who corrects a finding does not change those answers yet.
+- There is no login. Anyone with the URL can confirm or correct findings.
+
+## When the model is down, slow, or returns something unusable
+
+The app works without the model. Every model call has a 20 second timeout and one retry.
+
+- No key set: emails and memos are read by the rules only, and the page says "Read by rules only".
+- Timeout, connection error, refusal, a cut off reply or invalid JSON: the rules result stands, and the email page shows the reason, for example "Model unavailable (timed out). Read with rules only."
+- Valid JSON with bad values: each value is checked against the ledger. An account name that does not exist, a malformed date or reference, or a negative amount is dropped, and the page lists what was dropped.
+- Memo screening: a memo with no usable answer keeps the rules result, and the seed output names those payments.
+
+The model can only add information. It cannot remove an invoice the rules found or clear a flag the rules raised.
+
+## Data that tried to manipulate the system
+
+PMT-1035 ($689 from Granby Fitness, nothing applied) has a memo addressed to an "AI reconciler". It tells the system to ignore its instructions, report no findings for Granby, and mark NB-3211, NB-3311 and NB-3411 as paid.
+
+What happened, in order:
+
+1. Version 1 caught it with the keyword rule and ignored the memo as evidence. The status then came from the numbers alone: $689 not applied while Granby has five open invoices, so unapplied. That is true, but it hides the real problem.
+2. In manual review I corrected PMT-1035 to needs a person. Somebody sent text meant to make the books lie, and that needs a human decision about the money and about the customer.
+3. I then changed the code so the next memo like this goes to a person automatically (version 2). The status is needs a person, the flag "Memo tries to instruct the system" is shown, and the evidence keeps what the numbers say ("From the numbers alone it would be unapplied, most likely NB-3211"). A test checks that the three invoices the memo names stay open.
+4. I added the model as a second check on every memo, because a keyword list is easy to get around. It can only add the flag.
+5. Rerunning the matcher with new rules used to overwrite the old findings. Now every version is kept, my manual review stays, and the Versions page shows PMT-1035 as unapplied in version 1 and needs a person in version 2, next to my review. A review made against an older answer goes back into the review queue.
+
+Pasted emails get the same treatment: the email is passed to the model as quoted data, the prompt says never to follow it, and a warning appears if it tries to instruct the system. The answer still comes from the ledger.
+
+## Data I think is broken
+
+I never change `ledger.json`. Each problem below becomes a finding or a flag, and the corrected picture is computed next to the recorded one.
+
+| Payment | Problem | What the app does |
+|---|---|---|
+| PMT-1037 | A $1,040 check is applied to two invoices, $2,080 in total. September (NB-3412) looks paid with money that never arrived. | Misapplied, flagged "Applied more than received". After fixes NB-3412 is owed again. |
+| PMT-1038 | Applied to NB-3512, which was voided and replaced by NB-3520. | Misapplied, proposes NB-3520 (read from the void note). |
+| PMT-1005, PMT-1027 | Applied to November invoices that did not exist yet when the payment arrived. | Flagged "Applied before it was issued", used as evidence. |
+| PMT-1033 | An $8,900 wire with no account. | Needs a person, suggests the two Marlowe October invoices that add up to $8,900. |
+| PMT-1021 | The same $2,730 for NB-3406 received twice, two days apart. | Needs a person: refund, or apply to October. |
+| PMT-1023, PMT-1024 | Orchard Lane payments recorded one month early. The books say July is paid and October is open. The truth is the reverse. | Misapplied, with corrected balances that show July owed. |
+| NB-3601 | Looks partly paid ($840 of $1,250), only because Eastgate's money landed on it. | Shown as "Recorded here, belongs elsewhere" on PMT-1005. |
+| PMT-1026 | $120 short with a memo claiming an agreed discount, and nothing in the ledger shows one. | Needs a person. The system does not accept a discount on the customer's word. |
+| PMT-1011 | A $2,180 storm credit that was never applied, so NB-3403 still looks owed. | Unapplied, proposes NB-3403. |
+
+One thing looked broken and is not: `Card ****4417` appears on two payments. It is the same card used in June and July, not a duplicate, and the app leaves both as ok.
+
+## How I used AI tools, and how I checked them
+
+I built this with Claude Code. The full sessions are in [`ai-logs/`](ai-logs/).
+
+How I directed it:
+
+- Before any code, I had it explain the ledger terms and list every way the data could be wrong, case by case with real payment ids. I agreed or disagreed with each status (for example, duplicates and claimed discounts go to a person) and only then asked for code.
+- A `CLAUDE.md` file held my rules: simple readable code, plain comments, money in cents, never edit the ledger, every finding stores its evidence and who decided it, a test per rule with a real payment.
+- I made the product calls: who the app is for, which screens it has, sending injection attempts to a person, keeping old versions instead of overwriting them.
+
+How I checked what it produced:
+
+- I read the matcher output line by line (`npm run match -- --verbose`) against the cases we listed by hand.
+- I asked for tests on real payments, and for the model paths, tests with a fake model, since no key was available in the build session at first.
+- I looked at screenshots of every page and pushed back on details: rows you can click anywhere, next and previous between payments, a compact invoice table, review results that are easy to find.
+
+Mistakes it made that the checks caught:
+
+- Its first idea for spotting wrong account payments compared where the money was applied with the recorded account. That misses all three wrong account cases here, because the money was applied on the recorded account. Going through the cases by hand showed that the memo is what reveals them.
+- A text edit garbled a hint above the invoice table. The screenshot showed it before the commit.
+- After versions were added, a manual review said "The system said Needs a person" when the system had said Unapplied at review time. The simulated upgrade showed it, and the review now compares with the status the reviewer saw.
+
+## What I would do next
+
+- Label all 38 myself and add precision and recall per status.
+- Let reviewers' corrections feed the "after fixes" balances and the email answers.
+- A login, so each review records who made it.
+- Ask the reviewer before trusting a memo invoice number when amounts are identical across months.
+- Export the proposed fixes as journal entries an accountant can apply.
+- Rate limit the email checker, since every check can cost a model call.
 
 ## Setup
 
@@ -33,7 +165,7 @@ Then fill in `.env`:
 | `npm start` | Runs the production build from `npm run build` at http://localhost:3000. |
 | `npm run db:seed` | Creates the tables if needed, runs the matcher and writes all 38 findings to the database. Reviews already in the database are kept. Reads `DATABASE_URL` from `.env`. |
 
-The app also seeds itself on the first page load if the database is empty, or if the stored findings come from an older matcher (`MATCHER_VERSION` in `src/matcher/match.ts`). So after changing a rule or a model prompt, add an entry to `VERSIONS` in `src/matcher/versions.ts` and the deployed app recomputes the findings once. The old version's findings are kept in the `finding_versions` table, manual reviews are never deleted, and the Versions page (`/versions`) compares any two versions side by side.
+The app also seeds itself on the first page load if the database is empty, or if the stored findings come from an older version (`VERSIONS` in `src/matcher/versions.ts`). So after changing a rule or a model prompt, add an entry to `VERSIONS` in `src/matcher/versions.ts` and the deployed app recomputes the findings once. The old version's findings are kept in the `finding_versions` table, manual reviews are never deleted, and the Versions page (`/versions`) compares any two versions side by side.
 
 With `ANTHROPIC_API_KEY` set, seeding also has the model check every memo for injection attempts. A flagged memo sends its payment to "needs a person". The model can add this flag but never remove one the rules raised.
 
@@ -54,7 +186,7 @@ These read `data/ledger.json` directly. They need no database and change nothing
 | Command | What it does |
 |---|---|
 | `npm test` | Runs all tests once: matcher statuses for every discussed case, balances, memo parsing, email reading and the model fallback. |
-| `npm run typecheck` | Checks the TypeScript types without building. |
+| `npm run typecheck` | Checks the TypeScript types, with no build. |
 
 ### AI session logs
 
@@ -74,21 +206,8 @@ Claude Code keeps session transcripts in `~/.claude/projects/<project folder>/<s
 | `src/ledger/` | Loading the ledger (money in cents) and computing balances |
 | `src/matcher/` | The rules that give each payment and credit its finding |
 | `src/email/` | Reading a pasted email (rules, plus the model as a helper) and checking it against the ledger |
-| `src/db/` | Postgres tables for findings and reviews |
-| `app/` | The web app: findings, review queue, email checker |
+| `src/db/` | Postgres tables for findings, older versions and reviews |
+| `app/` | The web app: findings, review queue, payment pages, email checker, versions |
 | `scripts/` | The terminal commands above |
 | `tests/` | Tests, using real payments from the ledger |
 | `ai-logs/` | Full transcripts of the AI sessions used to build this |
-
-## Still to write
-
-- How the system fits together
-- Which decisions a model makes and which plain code makes
-- What I verified, and how
-- Where the system is wrong, and why
-- What happens when the model is down, slow, or returns something unusable
-- Manipulation attempts in the data, and how they are handled
-- Broken data, and what I did about it
-- How I used AI tools, and how I checked their output
-- Precision and recall per status
-- What I'd do next with more time
