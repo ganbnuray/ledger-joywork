@@ -23,7 +23,7 @@ flowchart LR
 1. The rules read each payment, its memo and its applications, and give it one finding: a status, the invoice and account the money most likely belongs to, the amount involved, and the evidence.
 2. The model reads each memo once more, only to spot attempts to instruct the system. It can send a payment to a person but cannot clear anything the rules flagged.
 3. Postgres stores the findings, the findings of every older version, and every manual review.
-4. The web app has the findings list, a review queue, a page per payment, an email checker and a page that compares versions. A Version menu in the top bar shows the whole app as any stored version gave it. Reviews are only made against the current version.
+4. The web app has the findings list, a review queue, a page per payment, an email checker, an evaluation page and a page that compares versions. A Version menu in the top bar shows the whole app as any stored version gave it. Reviews are only made against the current version.
 5. A pasted email is read by the rules and the model into a fixed set of fields. Code then checks those fields against the ledger and the findings. The email never decides the answer.
 
 ### Which decisions the model makes, and which plain code makes
@@ -52,7 +52,13 @@ The model never sees the findings and never decides what is owed. I kept it to r
 
 ### Precision and recall
 
-Not done yet. The spec asks me to label all 38 payments and credits myself and compare. The review form on each payment page stores exactly what a label needs (status, invoices, account, note), so the plan is to review all 38 in the app, export the reviews as `data/labels.json`, and show precision and recall per status on a page. The matcher was built from cases I worked out by hand before writing code, so for now its agreement with my own reading is high by construction. That is why an honest comparison needs labels made separately.
+My labels are my manual reviews. I reviewed all 38 payments and credits in the app, and for each one the latest review is the label: status, where the money belongs, and a note. They are committed in [`data/labels.json`](data/labels.json).
+
+The Evaluation page (`/evaluation`) compares a version with these labels: precision and recall per status, a confusion table, and the payments where the system and I disagree. The Version menu scores version 1 or version 2 against the same labels. `npm run evaluate` prints the same numbers from the committed file.
+
+LABELS_TABLE
+
+I worked out the cases by hand before writing the rules, and I labeled the same data afterward, so high agreement is expected. The disagreements say more than the percentages.
 
 ### Where the system is wrong, and why
 
@@ -157,7 +163,7 @@ Mistakes it made that the checks caught:
 
 ## What I would do next
 
-- Label all 38 myself and add precision and recall per status.
+- Have a second person label the 38 payments, so the evaluation does not rest on the same person who designed the rules.
 - Let reviewers' corrections feed the "after fixes" balances and the email answers.
 - A login, so each review records who made it.
 - Ask the reviewer before trusting a memo invoice number when amounts are identical across months.
@@ -213,6 +219,13 @@ These read `data/ledger.json` directly. They need no database and change nothing
 |---|---|
 | `npm test` | Runs all tests once: matcher statuses for every discussed case, balances, memo parsing, email reading and the model fallback. |
 | `npm run typecheck` | Checks the TypeScript types, with no build. |
+| `npm run evaluate` | Prints precision and recall per status for version 1 and version 2 against `data/labels.json`. |
+
+### Labels
+
+| Command | What it does |
+|---|---|
+| `npm run labels:export` | Writes the latest manual review of each payment to `data/labels.json`. Reads `DATABASE_URL` from `.env`, so point it at the database that holds the reviews (the production one on Vercel). |
 
 ### AI session logs
 
@@ -232,8 +245,9 @@ Claude Code keeps session transcripts in `~/.claude/projects/<project folder>/<s
 | `src/ledger/` | Loading the ledger (money in cents) and computing balances |
 | `src/matcher/` | The rules that give each payment and credit its finding |
 | `src/email/` | Reading a pasted email (rules, plus the model as a helper) and checking it against the ledger |
+| `src/eval/` | Precision, recall and the confusion table |
 | `src/db/` | Postgres tables for findings, older versions and reviews |
-| `app/` | The web app: findings, review queue, payment pages, email checker, versions |
+| `app/` | The web app: findings, review queue, payment pages, email checker, evaluation, versions |
 | `scripts/` | The terminal commands above |
 | `tests/` | Tests, using real payments from the ledger |
 | `ai-logs/` | Full transcripts of the AI sessions used to build this |

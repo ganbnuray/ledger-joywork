@@ -10,7 +10,9 @@
     "match": "tsx scripts/run-matcher.ts",
     "check-email": "tsx scripts/check-email.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "labels:export": "tsx --env-file=.env scripts/export-labels.ts",
+    "evaluate": "tsx scripts/evaluate.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
