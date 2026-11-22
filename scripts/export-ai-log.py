@@ -1,6 +1,7 @@
 import json, re, sys
 
 src, out = sys.argv[1], sys.argv[2]
+title = sys.argv[3] if len(sys.argv) > 3 else "design and rule based matcher"
 MAX_RESULT = 4000
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@gmail(\.com)?")
 REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
@@ -22,7 +23,7 @@ def result_text(content):
             parts.append(f"[{c.get('type')} content]")
     return "\n".join(parts)
 
-lines = ["# Claude Code session: design and rule based matcher", "",
+lines = [f"# Claude Code session: {title}", "",
          "Exported from the Claude Code session transcript. User messages, assistant replies and tool calls are complete.",
          f"Tool results longer than {MAX_RESULT} characters are cut, and system reminders and my email address are removed.", ""]
 
