@@ -7,7 +7,8 @@ import { addReview, listFindings } from "@/src/db/findings";
 import { matchAll, type Status } from "@/src/matcher/match";
 import { readEmail, type ReadResult } from "@/src/email/model";
 import { checkEmail, type EmailCheck } from "@/src/email/check";
-import { STATUSES, needsReview } from "@/src/view/labels";
+import { STATUSES } from "@/src/view/labels";
+import { reviewQueue } from "@/src/view/filter";
 
 export async function reviewFinding(formData: FormData) {
   const paymentId = String(formData.get("paymentId"));
@@ -25,10 +26,12 @@ export async function reviewFinding(formData: FormData) {
 
   // From the review queue, move on to the next finding that still needs a look.
   if (from === "review") {
-    const next = (await listFindings(ledger)).find((f) => needsReview(f) && f.reviews.length === 0);
+    const next = reviewQueue(await listFindings(ledger)).find((f) => f.reviews.length === 0);
     redirect(next ? `/findings/${next.paymentId}?from=review` : "/review");
   }
-  redirect(`/findings/${paymentId}`);
+  // Stay in the same filtered list. Only a plain query string is accepted.
+  const query = String(formData.get("query") ?? "");
+  redirect(`/findings/${paymentId}${/^\?[\w=&%+.-]*$/.test(query) ? query : ""}`);
 }
 
 export type EmailState = { text: string; read: ReadResult; result: EmailCheck } | null;

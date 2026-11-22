@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import { listFindings, type StoredFinding } from "@/src/db/findings";
-import { needsReview } from "@/src/view/labels";
+import { reviewQueue } from "@/src/view/filter";
 import { FindingStatus } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ function QueueItem({ f }: { f: StoredFinding }) {
 export default async function ReviewPage() {
   const all = await listFindings(ledger);
   // Biggest amounts first, so the most money at stake gets looked at first.
-  const unsure = all.filter(needsReview).sort((a, b) => b.amount - a.amount);
+  const unsure = reviewQueue(all);
   const waiting = unsure.filter((f) => f.reviews.length === 0);
   const done = unsure.filter((f) => f.reviews.length > 0);
 

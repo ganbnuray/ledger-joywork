@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
 import type { Application } from "@/src/ledger/types";
-import { getFinding, listFindings } from "@/src/db/findings";
+import { listFindings } from "@/src/db/findings";
 import { STATUSES, STATUS_HELP, STATUS_LABEL, flagLabel, needsReview } from "@/src/view/labels";
+import { filterFindings, filterQuery, reviewQueue, type FindingFilter } from "@/src/view/filter";
 import { reviewFinding } from "../../actions";
 import { FindingStatus, StatusBadge } from "../../ui";
+import { Pager } from "../../nav";
 
 export const dynamic = "force-dynamic";
 
@@ -53,11 +55,12 @@ export default async function FindingPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<FindingFilter & { from?: string }>;
 }) {
   const { id } = await params;
-  const { from } = await searchParams;
-  const finding = await getFinding(ledger, id);
+  const { from, ...filter } = await searchParams;
+  const all = await listFindings(ledger);
+  const finding = all.find((f) => f.paymentId === id);
   const payment = ledger.payments.find((p) => p.id === id);
   if (!finding || !payment) notFound();
 
@@ -66,14 +69,33 @@ export default async function FindingPage({
   const suspicious = finding.flags.some((f) => f.kind === "suspicious_memo");
   const fromReview = from === "review";
 
-  const queue = fromReview ? (await listFindings(ledger)).filter((f) => needsReview(f) && f.reviews.length === 0) : [];
-  const position = queue.findIndex((f) => f.paymentId === id);
+  const queue = fromReview ? all.filter((f) => needsReview(f) && f.reviews.length === 0) : [];
+
+  // Previous and next follow the list the person came from: the review queue, or the filtered findings.
+  const query = fromReview ? "?from=review" : filterQuery(filter);
+  const list = fromReview ? reviewQueue(all) : filterFindings(all, filter, ledger);
+  const index = list.findIndex((f) => f.paymentId === id);
+  const prev = index > 0 ? list[index - 1] : null;
+  const next = index >= 0 && index < list.length - 1 ? list[index + 1] : null;
+  const listName = fromReview ? "in the review queue" : query ? "in this filtered list" : "";
+  const backHref = fromReview ? "/review" : `/findings${query}`;
 
   return (
     <>
-      <Link href={fromReview ? "/review" : "/findings"} className="back">
-        ← {fromReview ? "Review queue" : "All findings"}
-      </Link>
+      <div className="detail-top">
+        <Link href={backHref} className="back">
+          ← {fromReview ? "Review queue" : query ? "Filtered findings" : "All findings"}
+        </Link>
+        {index >= 0 && (
+          <Pager
+            prevHref={prev ? `/findings/${prev.paymentId}${query}` : null}
+            nextHref={next ? `/findings/${next.paymentId}${query}` : null}
+            prevLabel={prev?.paymentId ?? null}
+            nextLabel={next?.paymentId ?? null}
+            position={`${index + 1} of ${list.length} ${listName}`.trim()}
+          />
+        )}
+      </div>
 
       <div className="detail-head">
         <h1>{payment.id}</h1>
@@ -81,7 +103,7 @@ export default async function FindingPage({
         {finding.confidence === "low" && <span className="tag">System unsure</span>}
         {fromReview && queue.length > 0 && (
           <span className="muted">
-            {position >= 0 ? `${position + 1} of ${queue.length} left to review` : `${queue.length} left to review`}
+            {queue.length} not reviewed yet
           </span>
         )}
       </div>
@@ -175,7 +197,7 @@ export default async function FindingPage({
         <form action={reviewFinding} className="review-form">
           <input type="hidden" name="paymentId" value={finding.paymentId} />
           <input type="hidden" name="systemStatus" value={finding.status} />
-          {fromReview && <input type="hidden" name="from" value="review" />}
+          {fromReview ? <input type="hidden" name="from" value="review" /> : <input type="hidden" name="query" value={query} />}
           <p>
             The system says <StatusBadge status={finding.status} />. Confirm it, or pick the status you think is right.
           </p>

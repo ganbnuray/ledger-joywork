@@ -1,50 +1,22 @@
 import Link from "next/link";
 import { ledger } from "@/src/ledger/bundled";
 import { formatCents } from "@/src/ledger/money";
-import { listFindings, type StoredFinding } from "@/src/db/findings";
+import { listFindings } from "@/src/db/findings";
 import { STATUSES, STATUS_HELP, STATUS_LABEL, flagLabel, needsReview } from "@/src/view/labels";
+import { effectiveStatus, filterFindings, filterQuery, type FindingFilter } from "@/src/view/filter";
 import type { Status } from "@/src/matcher/match";
 import { FindingStatus } from "../ui";
+import { ClickableRow } from "../nav";
 
 export const dynamic = "force-dynamic";
 
-type Search = { status?: string; org?: string; review?: string; q?: string };
-
-function effectiveStatus(f: StoredFinding): Status {
-  return f.reviewedStatus ?? f.status;
-}
-
-function matchesSearch(f: StoredFinding, q: string): boolean {
-  const p = ledger.payments.find((x) => x.id === f.paymentId)!;
-  const haystack = [
-    p.id,
-    p.reference,
-    p.memo,
-    p.customerId ?? "",
-    ...p.applications.map((a) => a.invoice),
-    ...f.likelyInvoices,
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(q.toLowerCase());
-}
-
-export default async function FindingsPage({ searchParams }: { searchParams: Promise<Search> }) {
+export default async function FindingsPage({ searchParams }: { searchParams: Promise<FindingFilter> }) {
   const search = await searchParams;
   const all = await listFindings(ledger);
   const orgs = [...new Set(ledger.customers.map((c) => c.parent))].sort();
-
-  const filtered = all.filter((f) => {
-    const p = ledger.payments.find((x) => x.id === f.paymentId)!;
-    const account = p.customerId ? ledger.customerById.get(p.customerId) : null;
-    if (search.status && effectiveStatus(f) !== search.status) return false;
-    if (search.org && account?.parent !== search.org && !(search.org === "none" && !account)) return false;
-    if (search.review === "unreviewed" && f.reviews.length > 0) return false;
-    if (search.review === "reviewed" && f.reviews.length === 0) return false;
-    if (search.review === "queue" && !needsReview(f)) return false;
-    if (search.q && !matchesSearch(f, search.q)) return false;
-    return true;
-  });
+  const filtered = filterFindings(all, search, ledger);
+  // Detail links carry the filters, so previous and next stay inside this list.
+  const query = filterQuery(search);
 
   // Status counts ignore the status filter, so they always show the whole picture.
   const countFor = (s: Status) => all.filter((f) => effectiveStatus(f) === s);
@@ -160,9 +132,9 @@ export default async function FindingsPage({ searchParams }: { searchParams: Pro
                 const likelyAccount =
                   f.likelyCustomerId && f.likelyCustomerId !== p.customerId ? ledger.customerById.get(f.likelyCustomerId) : null;
                 return (
-                  <tr key={f.paymentId} className="link-row">
+                  <ClickableRow key={f.paymentId} href={`/findings/${f.paymentId}${query}`}>
                     <td>
-                      <Link href={`/findings/${f.paymentId}`} className="row-link">
+                      <Link href={`/findings/${f.paymentId}${query}`} className="row-link">
                         {f.paymentId}
                       </Link>
                       <div className="muted" style={{ fontSize: 12 }}>
@@ -200,7 +172,7 @@ export default async function FindingsPage({ searchParams }: { searchParams: Pro
                         ))}
                       </div>
                     </td>
-                  </tr>
+                  </ClickableRow>
                 );
               })}
             </tbody>

@@ -586,3 +586,35 @@ tbody tr.link-row:hover {
 .row-link {
   white-space: nowrap;
 }
+
+tbody tr.link-row {
+  cursor: pointer;
+}
+
+.detail-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pager .button {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.pager-position {
+  font-size: 13px;
+}
+
+.button.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
